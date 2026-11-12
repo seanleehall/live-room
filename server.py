@@ -160,10 +160,14 @@ def questions(code):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     if request.method == 'POST':
-        if not check_password(code, request.headers.get('X-Password', '')):
+        pw = request.headers.get('X-Password', '')
+        if not check_password(code, pw):
             conn.close()
             return jsonify({'error': 'Unauthorized'}), 401
-        data = request.json
+        data = request.json or {}
+        if not data.get('text'):
+            conn.close()
+            return jsonify({'error': 'Question text required'}), 400
         c.execute('INSERT INTO questions (host_code, text, qtype, options) VALUES (?, ?, ?, ?)',
                   (code, data['text'], data.get('type', 'yesno'), data.get('options', '')))
         conn.commit()
