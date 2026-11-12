@@ -59,6 +59,16 @@
       catch { state.questions = []; }
     }
 
+    async function loadHostBranding() {
+      if (!state.hostCode) return;
+      try {
+        const b = await api(`/api/host/${state.hostCode}`);
+        if (b.name) state.branding.name = b.name;
+        if (b.primary) state.branding.primary = b.primary;
+        if (b.logo) state.branding.logo = b.logo;
+      } catch {}
+    }
+
     function qrSrc(text) {
       return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=${encodeURIComponent(text)}`;
     }
@@ -138,8 +148,7 @@
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8">
             <div class="text-center max-w-md w-full">
-              <h1 class="text-5xl font-bold mb-3" style="color:${primary}">pollme.live</h1>
-              <p class="text-xl text-stone-600 mb-10">Ask questions. See the room answer. No log-in needed.</p>
+              <h1 class="text-5xl font-bold mb-10" style="color:${primary}">pollme.live</h1>
               <div class="space-y-3">
                 <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
                 <button onclick="joinAudience()" class="w-full py-3.5 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
@@ -226,7 +235,7 @@
       } else if (state.view === 'audience') {
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
-            <p class="text-xs text-stone-500 mb-2">No sign-in. Tap an answer on this phone.</p>
+            ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-16 mb-4 object-contain" />` : ''}
             <h1 class="text-xl font-bold mb-6" style="color:${primary}">${name}</h1>
             <div id="live-q" class="text-xl font-semibold mb-2">Waiting for the host to start a question…</div>
             <div id="timer" class="text-sm text-stone-500 mb-6"></div>
@@ -329,7 +338,12 @@
 
     function joinAudience() {
       const code = new URLSearchParams(location.search).get('join') || prompt('Enter host code:');
-      if (code) { state.hostCode = code.toUpperCase(); state.view = 'audience'; state.answered = false; render(); }
+      if (code) {
+        state.hostCode = code.toUpperCase();
+        state.view = 'audience';
+        state.answered = false;
+        loadHostBranding().then(() => render());
+      }
     }
 
     function openProjector() { window.open(`/?projector=1&code=${state.hostCode}`, '_blank'); }
@@ -384,9 +398,17 @@
     }
 
     const params = new URLSearchParams(location.search);
-    if (params.get('projector')) { state.hostCode = params.get('code') || ''; state.view = 'projector'; }
-    else if (params.get('join')) { state.hostCode = params.get('join'); state.view = 'audience'; }
-    render();
+    if (params.get('projector')) {
+      state.hostCode = params.get('code') || '';
+      state.view = 'projector';
+      loadHostBranding().then(() => render());
+    } else if (params.get('join')) {
+      state.hostCode = params.get('join');
+      state.view = 'audience';
+      loadHostBranding().then(() => render());
+    } else {
+      render();
+    }
   </script>
 </body>
 </html>
