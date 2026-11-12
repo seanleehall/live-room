@@ -212,21 +212,10 @@
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8">
             <div class="text-center max-w-md w-full">
-              <h1 class="text-5xl font-bold mb-6" style="color:${primary}">pollme.live</h1>
-              <div class="grid grid-cols-3 gap-4 mb-10 text-sm">
-                <div class="p-4 rounded-2xl bg-white/70 border border-stone-200">
-                  <div class="text-2xl mb-1">1</div>
-                  <div class="font-medium">Ask questions</div>
-                </div>
-                <div class="p-4 rounded-2xl bg-white/70 border border-stone-200">
-                  <div class="text-2xl mb-1">2</div>
-                  <div class="font-medium">See the room answer</div>
-                </div>
-                <div class="p-4 rounded-2xl bg-white/70 border border-stone-200">
-                  <div class="text-2xl mb-1">3</div>
-                  <div class="font-medium">No log-in needed</div>
-                </div>
-              </div>
+              <h1 class="text-5xl font-bold mb-4" style="color:${primary}">pollme.live</h1>
+              <p class="text-stone-600 mb-2">Ask questions.</p>
+              <p class="text-stone-600 mb-2">See the room answer.</p>
+              <p class="text-stone-600 mb-10">No log-in needed.</p>
               <div class="space-y-3">
                 <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
                 <button onclick="joinAudience()" class="w-full py-3.5 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
@@ -559,17 +548,26 @@
       if (!code) return;
       const password = prompt('Enter your password:');
       if (!password) return;
+      const upperCode = code.trim().toUpperCase();
       try {
-        await api(`/api/host/${code.toUpperCase()}/auth`, { method: 'POST', body: { password } });
-        state.hostCode = code.toUpperCase();
+        const authRes = await fetch(API + `/api/host/${upperCode}/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password })
+        });
+        if (!authRes.ok) {
+          alert('Wrong code or password.');
+          return;
+        }
+        state.hostCode = upperCode;
         state.hostPassword = password;
         saveLocal();
         await loadQuestions();
         await loadHostBranding();
         state.view = 'host';
         render();
-      } catch {
-        alert('Wrong code or password.');
+      } catch (e) {
+        alert('Could not resume: ' + (e.message || 'Wrong code or password.'));
       }
     }
 
