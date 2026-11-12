@@ -47,8 +47,10 @@
     }
 
     function saveLocal() {
-      localStorage.setItem('hostCode', state.hostCode);
-      localStorage.setItem('branding', JSON.stringify(state.branding));
+      try {
+        localStorage.setItem('hostCode', state.hostCode);
+        localStorage.setItem('branding', JSON.stringify(state.branding));
+      } catch (e) { console.warn('localStorage full', e); }
     }
 
     async function loadQuestions() {
@@ -65,22 +67,24 @@
       const img = new Image();
       img.crossOrigin = 'Anonymous';
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = 50; canvas.height = 50;
-        ctx.drawImage(img, 0, 0, 50, 50);
-        const data = ctx.getImageData(0, 0, 50, 50).data;
-        const colors = {};
-        for (let i = 0; i < data.length; i += 4) {
-          const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
-          if (a < 128 || (r > 240 && g > 240 && b > 240) || (r < 15 && g < 15 && b < 15)) continue;
-          const key = `${Math.round(r/16)*16},${Math.round(g/16)*16},${Math.round(b/16)*16}`;
-          colors[key] = (colors[key] || 0) + 1;
-        }
-        let max = 0, best = '30,58,95';
-        for (const [k, v] of Object.entries(colors)) if (v > max) { max = v; best = k; }
-        const [r,g,b] = best.split(',').map(Number);
-        callback('#' + [r,g,b].map(x => x.toString(16).padStart(2,'0')).join(''));
+        try {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = 50; canvas.height = 50;
+          ctx.drawImage(img, 0, 0, 50, 50);
+          const data = ctx.getImageData(0, 0, 50, 50).data;
+          const colors = {};
+          for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
+            if (a < 128 || (r > 240 && g > 240 && b > 240) || (r < 15 && g < 15 && b < 15)) continue;
+            const key = `${Math.round(r/16)*16},${Math.round(g/16)*16},${Math.round(b/16)*16}`;
+            colors[key] = (colors[key] || 0) + 1;
+          }
+          let max = 0, best = '30,58,95';
+          for (const [k, v] of Object.entries(colors)) if (v > max) { max = v; best = k; }
+          const [r,g,b] = best.split(',').map(Number);
+          callback('#' + [r,g,b].map(x => x.toString(16).padStart(2,'0')).join(''));
+        } catch { callback(state.branding.primary); }
       };
       img.onerror = () => callback(state.branding.primary);
       img.src = imgSrc;
@@ -167,11 +171,12 @@
             <section class="card mb-6">
               <h2 class="font-semibold mb-4">Change Branding</h2>
               <label class="block text-sm mb-1">Room name</label>
-              <input id="brandName" class="mb-3" value="${name}" />
+              <input id="brandName" class="mb-3" value="${name.replace(/"/g,'"')}" />
               <label class="block text-sm mb-1">Upload your company logo to change the theme</label>
               <input id="brandLogo" type="file" accept="image/*" class="mb-3" />
-              <button onclick="saveBrand()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save</button>
+              <button id="saveBrandBtn" onclick="saveBrand()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save</button>
               <button onclick="toggleBrand()" class="ml-2 px-4 py-2 rounded-lg bg-stone-200 text-sm">Cancel</button>
+              <div id="brandStatus" class="text-sm text-stone-500 mt-2"></div>
             </section>` : ''}
             <div class="grid lg:grid-cols-2 gap-6">
               <section class="card">
@@ -264,8 +269,14 @@
     function toggleAdd() { state.showAdd = !state.showAdd; render(); }
 
     async function saveBrand() {
+      const btn = document.getElementById('saveBrandBtn');
+      const status = document.getElementById('brandStatus');
+      if (btn) btn.disabled = true;
+      if (status) status.textContent = 'Saving…';
+
       const name = document.getElementById('brandName').value.trim();
       if (name) state.branding.name = name;
+
       const file = document.getElementById('brandLogo').files[0];
       if (file) {
         const reader = new FileReader();
@@ -273,18 +284,31 @@
           state.branding.logo = reader.result;
           getDominantColor(reader.result, color => {
             state.branding.primary = color;
-            finishBrand();
+            applyBrand();
           });
         };
+        reader.onerror = () => applyBrand();
         reader.readAsDataURL(file);
-      } else finishBrand();
+      } else {
+        applyBrand();
+      }
     }
-    function finishBrand() {
+
+    function applyBrand() {
       saveLocal();
-      api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding }).finally(() => {
-        state.showBrand = false;
-        render();
-      });
+      state.showBrand = false;
+      render();
+      // Try to sync to server in the background (don't block the UI)
+      if (state.hostCode) {
+        api(`/api/host/${state.hostCode}/branding`, {
+          method: 'POST',
+          body: {
+            name: state.branding.name,
+            primary: state.branding.primary,
+            logo: state.branding.logo && state.branding.logo.length < 500000 ? state.branding.logo : ''
+          }
+        }).catch(() => {});
+      }
     }
 
     async function saveQuestion() {
