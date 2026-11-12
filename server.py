@@ -113,14 +113,23 @@ def start_session():
     sid = str(uuid.uuid4())[:8]
     conn = sqlite3.connect(DB)
     c = conn.cursor()
-    # Deactivate previous sessions for this host
     c.execute('UPDATE sessions SET active=0 WHERE host_code=?', (data['host'],))
     c.execute('INSERT INTO sessions (id, host_code, question_id, started, duration) VALUES (?, ?, ?, ?, ?)',
-              (sid, data['host'], data['question_id'], int(time.time()), data.get('duration', 180)))
+              (sid, data['host'], data['question_id'], int(time.time()), data.get('duration', 0)))
     c.execute('UPDATE questions SET used = used + 1 WHERE id=?', (data['question_id'],))
     conn.commit()
     conn.close()
     return jsonify({'session_id': sid})
+
+@app.route('/api/session/end', methods=['POST'])
+def end_session():
+    data = request.json
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute('UPDATE sessions SET active=0 WHERE host_code=?', (data['host'],))
+    conn.commit()
+    conn.close()
+    return jsonify({'ok': True})
 
 @app.route('/api/host/<code>/current', methods=['GET'])
 def current_session(code):
@@ -128,53 +137,22 @@ def current_session(code):
     c = conn.cursor()
     c.execute('''SELECT s.id, s.started, s.duration, s.active, q.text, q.qtype, q.options
                  FROM sessions s JOIN questions q ON s.question_id = q.id
-                 WHERE s.host_code=? AND s.active=1 ORDER BY s.started DESC LIMIT 1''', (code,))
+                 WHERE s.host_code=? ORDER BY s.started DESC LIMIT 1''', (code,))
     row = c.fetchone()
     if not row:
-        conn.close()
-        return jsonify({'active': False})
-    now = int(time.time())
-    remaining = max(0, row[2] - (now - row[1]))
-    if remaining <= 0:
-        c.execute('UPDATE sessions SET active=0 WHERE id=?', (row[0],))
-        conn.commit()
         conn.close()
         return jsonify({'active': False})
     c.execute('SELECT choice, COUNT(*) FROM answers WHERE session_id=? GROUP BY choice', (row[0],))
     counts = dict(c.fetchall())
     conn.close()
     return jsonify({
-        'active': True,
+        'active': bool(row[3]),
         'session_id': row[0],
         'started': row[1],
         'duration': row[2],
-        'remaining': remaining,
         'question': row[4],
         'type': row[5],
         'options': row[6],
-        'results': counts
-    })
-
-@app.route('/api/session/<sid>', methods=['GET'])
-def get_session(sid):
-    conn = sqlite3.connect(DB)
-    c = conn.cursor()
-    c.execute('''SELECT s.started, s.duration, s.active, q.text, q.qtype, q.options
-                 FROM sessions s JOIN questions q ON s.question_id = q.id WHERE s.id=?''', (sid,))
-    row = c.fetchone()
-    if not row:
-        conn.close()
-        return jsonify({'error': 'not found'}), 404
-    c.execute('SELECT choice, COUNT(*) FROM answers WHERE session_id=? GROUP BY choice', (sid,))
-    counts = dict(c.fetchall())
-    conn.close()
-    return jsonify({
-        'started': row[0],
-        'duration': row[1],
-        'active': row[2],
-        'question': row[3],
-        'type': row[4],
-        'options': row[5],
         'results': counts
     })
 
@@ -183,6 +161,11 @@ def submit_answer():
     data = request.json
     conn = sqlite3.connect(DB)
     c = conn.cursor()
+    c.execute('SELECT active FROM sessions WHERE id=?', (data['session_id'],))
+    row = c.fetchone()
+    if not row or not row[0]:
+        conn.close()
+        return jsonify({'error': 'not active'}), 400
     c.execute('INSERT INTO answers (session_id, choice, timestamp) VALUES (?, ?, ?)',
               (data['session_id'], data['choice'], int(time.time())))
     conn.commit()
