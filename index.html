@@ -47,6 +47,18 @@
     };
     let pollTimer;
 
+    function updateUrl() {
+      if (state.view === 'host' && state.hostCode) {
+        history.replaceState(null, '', `/?host=${state.hostCode}`);
+      } else if (state.view === 'audience' && state.hostCode) {
+        history.replaceState(null, '', `/?join=${state.hostCode}`);
+      } else if (state.view === 'projector' && state.hostCode) {
+        history.replaceState(null, '', `/?projector=1&code=${state.hostCode}`);
+      } else {
+        history.replaceState(null, '', '/');
+      }
+    }
+
     function applyTheme() {
       const bg = state.branding.background || '#f3eee4';
       const primary = state.branding.primary || '#1e3a5f';
@@ -201,6 +213,7 @@
 
     function render() {
       applyTheme();
+      updateUrl();
       const app = document.getElementById('app');
       const primary = state.branding.primary || '#1e3a5f';
       const name = state.branding.name || 'pollme.live';
@@ -477,7 +490,7 @@
       try {
         await api(`/api/host/${state.hostCode}/questions`, {
           method: 'POST',
-          body: { text, type: options ? 'custom' : 'yesno', options }
+          body: { text, type: options ? 'custom' : 'yesno', options, password: state.hostPassword }
         });
         state.showAdd = false;
         state.statusMsg = 'Question saved.';
@@ -491,7 +504,7 @@
 
     async function archiveQuestion(qid) {
       try {
-        await api(`/api/host/${state.hostCode}/questions/${qid}/archive`, { method: 'POST', body: { archived: true } });
+        await api(`/api/host/${state.hostCode}/questions/${qid}/archive`, { method: 'POST', body: { archived: true, password: state.hostPassword } });
         await loadQuestions();
         render();
       } catch {}
@@ -502,7 +515,7 @@
       const qid = sel && sel.value;
       if (!qid) return;
       try {
-        await api(`/api/host/${state.hostCode}/questions/${qid}/archive`, { method: 'POST', body: { archived: false } });
+        await api(`/api/host/${state.hostCode}/questions/${qid}/archive`, { method: 'POST', body: { archived: false, password: state.hostPassword } });
         await loadQuestions();
         render();
       } catch {}
@@ -585,7 +598,7 @@
 
     async function startQuestion(qid) {
       try {
-        await api('/api/session', { method: 'POST', body: { host: state.hostCode, question_id: qid } });
+        await api('/api/session', { method: 'POST', body: { host: state.hostCode, question_id: qid, password: state.hostPassword } });
         state.statusMsg = 'Live — projector and phones will update.';
         await loadQuestions();
         render();
@@ -595,7 +608,7 @@
 
     async function endQuestion() {
       try {
-        await api('/api/session/end', { method: 'POST', body: { host: state.hostCode } });
+        await api('/api/session/end', { method: 'POST', body: { host: state.hostCode, password: state.hostPassword } });
         state.statusMsg = 'Ended.';
         await loadQuestions();
         render();
@@ -652,6 +665,10 @@
       state.hostCode = params.get('join');
       state.view = 'audience';
       loadHostBranding().then(() => render());
+    } else if (params.get('host')) {
+      state.hostCode = params.get('host');
+      state.view = 'host';
+      loadQuestions().then(() => loadHostBranding()).then(() => render());
     } else {
       applyTheme();
       render();
