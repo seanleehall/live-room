@@ -7,28 +7,26 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-900 text-slate-100">
   <div id="app" class="min-h-screen"></div>
   <script>
-    const API = window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1') ? window.location.origin : '';
+    const API = window.location.origin;
     let state = {
       view: 'home',
       hostCode: localStorage.getItem('hostCode') || '',
-      branding: JSON.parse(localStorage.getItem('branding') || '{"name":"Live Room","primary":"#1e40af","logo":""}'),
+      branding: JSON.parse(localStorage.getItem('branding') || '{"name":"Live Room","primary":"#3b82f6","logo":""}'),
       questions: [],
-      currentSession: null
+      activeSession: null
     };
 
     async function api(path, opts = {}) {
-      if (!API) return null;
-      try {
-        const res = await fetch(API + path, {
-          headers: { 'Content-Type': 'application/json' },
-          ...opts,
-          body: opts.body ? JSON.stringify(opts.body) : undefined
-        });
-        return res.ok ? res.json() : null;
-      } catch { return null; }
+      const res = await fetch(API + path, {
+        headers: { 'Content-Type': 'application/json' },
+        ...opts,
+        body: opts.body ? JSON.stringify(opts.body) : undefined
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
     }
 
     function saveLocal() {
@@ -37,39 +35,39 @@
     }
 
     async function loadQuestions() {
-      if (API && state.hostCode) {
-        const qs = await api(`/api/host/${state.hostCode}/questions`);
-        if (qs) state.questions = qs;
-      } else {
-        state.questions = JSON.parse(localStorage.getItem('questions') || '[]');
+      if (!state.hostCode) return;
+      try {
+        state.questions = await api(`/api/host/${state.hostCode}/questions`);
+      } catch (e) {
+        console.error(e);
+        state.questions = [];
       }
     }
 
     function render() {
       const app = document.getElementById('app');
-      const primary = state.branding.primary || '#1e40af';
-      
+      const primary = state.branding.primary || '#3b82f6';
+
       if (state.view === 'home') {
         app.innerHTML = `
           <div class="max-w-md mx-auto p-8 text-center">
             <h1 class="text-4xl font-bold mb-2" style="color:${primary}">Live Room</h1>
-            <p class="mb-8 text-slate-600">Ask one question. See the room answer.</p>
+            <p class="mb-8 text-slate-400">Ask one question. See the room answer.</p>
             <div class="space-y-3">
               <button onclick="startHost()" class="w-full py-3 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
               <button onclick="joinAudience()" class="w-full py-3 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
             </div>
-          </div>
-        `;
+          </div>`;
       } else if (state.view === 'host') {
         app.innerHTML = `
           <div class="max-w-3xl mx-auto p-6">
             <header class="flex items-center justify-between mb-8">
               <div>
                 <h1 class="text-2xl font-bold" style="color:${primary}">${state.branding.name}</h1>
-                <p class="text-sm text-slate-500">Host code: <span class="font-mono font-bold">${state.hostCode}</span></p>
+                <p class="text-sm text-slate-400">Host code: <span class="font-mono font-bold">${state.hostCode}</span></p>
               </div>
               <div class="flex gap-2">
-                <button onclick="openProjector()" class="px-4 py-2 rounded-lg bg-slate-200">Projector</button>
+                <button onclick="openProjector()" class="px-4 py-2 rounded-lg bg-slate-700">Projector</button>
                 <button onclick="editBranding()" class="px-4 py-2 rounded-lg text-white" style="background:${primary}">Branding</button>
               </div>
             </header>
@@ -78,58 +76,54 @@
                 <h2 class="text-lg font-semibold">Question library</h2>
                 <button onclick="addQuestion()" class="px-3 py-1.5 rounded-lg text-white text-sm" style="background:${primary}">+ Add</button>
               </div>
-              <div id="qlist" class="space-y-2">${renderQList()}</div>
+              <div class="space-y-2">${renderQList()}</div>
             </section>
-            <div class="mt-8 p-4 bg-white rounded-xl border">
-              <p class="text-sm text-slate-500 mb-2">Share this link or QR for audience</p>
-              <div id="qr" class="inline-block"></div>
-              <p class="mt-2 font-mono text-sm">${window.location.origin}/?join=${state.hostCode}</p>
+            <div class="mt-8 p-4 bg-slate-800 rounded-xl border border-slate-700 text-center">
+              <p class="text-sm text-slate-400 mb-3">Audience link / QR code</p>
+              <canvas id="qr" class="mx-auto bg-white p-2 rounded"></canvas>
+              <p class="mt-3 font-mono text-sm break-all">${window.location.origin}/?join=${state.hostCode}</p>
             </div>
-          </div>
-        `;
+          </div>`;
         setTimeout(() => {
           const canvas = document.getElementById('qr');
           if (canvas && window.QRCode) {
-            QRCode.toCanvas(canvas, `${window.location.origin}/?join=${state.hostCode}`, { width: 160 }, () => {});
+            QRCode.toCanvas(canvas, `${window.location.origin}/?join=${state.hostCode}`, { width: 180, margin: 1 });
           }
         }, 100);
       } else if (state.view === 'projector') {
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8 text-center text-white" style="background:${primary}">
-            ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-20 mb-6 object-contain" />` : ''}
+            ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-24 mb-6 object-contain bg-white/10 rounded-xl p-2" />` : ''}
             <h1 class="text-5xl font-bold mb-8">${state.branding.name}</h1>
             <div id="live" class="text-3xl max-w-3xl">Waiting for the host to start a question…</div>
-          </div>
-        `;
-        pollProjector();
+          </div>`;
+        pollLive();
       } else if (state.view === 'audience') {
         app.innerHTML = `
           <div class="max-w-md mx-auto p-6 text-center">
             <h1 class="text-2xl font-bold mb-4" style="color:${primary}">Answer</h1>
-            <div id="aud">Looking for the current question…</div>
-          </div>
-        `;
-        pollAudience();
+            <div id="aud">Waiting for the host to start a question…</div>
+          </div>`;
+        pollLive();
       }
     }
 
     function renderQList() {
       if (!state.questions.length) return '<p class="text-slate-500 italic">No questions yet.</p>';
       return state.questions.map(q => `
-        <div class="bg-white border rounded-xl p-4 flex justify-between items-center">
+        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex justify-between items-center">
           <div>
             <div class="font-medium">${q.text}</div>
-            <div class="text-xs text-slate-500">Used ${q.used || 0} times</div>
+            <div class="text-xs text-slate-400">Used ${q.used || 0} times</div>
           </div>
-          <button onclick="startQ(${q.id || 0}, '${q.text.replace(/'/g, "\\'")}')" class="px-4 py-1.5 rounded-lg text-white text-sm" style="background:${state.branding.primary || '#1e40af'}">Start timer</button>
-        </div>
-      `).join('');
+          <button onclick="startQuestion(${q.id})" class="px-4 py-1.5 rounded-lg text-white text-sm" style="background:${state.branding.primary || '#3b82f6'}">Start timer</button>
+        </div>`).join('');
     }
 
     async function startHost() {
       if (!state.hostCode) {
         const res = await api('/api/host', { method: 'POST', body: state.branding });
-        state.hostCode = res?.code || Math.random().toString(36).substring(2, 8).toUpperCase();
+        state.hostCode = res.code;
         saveLocal();
       }
       await loadQuestions();
@@ -147,58 +141,49 @@
     }
 
     function openProjector() {
-      window.open(`/?projector=1&code=${state.hostCode}`, 'projector');
+      window.open(`/?projector=1&code=${state.hostCode}`, '_blank');
     }
 
     async function addQuestion() {
-      const text = prompt('Question:');
+      const text = prompt('Question text:');
       if (!text) return;
-      const type = prompt('Type (yesno / scale / custom):', 'yesno');
-      if (API) {
-        await api(`/api/host/${state.hostCode}/questions`, { method: 'POST', body: { text, type } });
-        await loadQuestions();
-      } else {
-        state.questions.push({ text, type, used: 0 });
-        localStorage.setItem('questions', JSON.stringify(state.questions));
-      }
-      render();
-    }
-
-    async function startQ(qid, text) {
-      if (API && qid) {
-        const res = await api('/api/session', { method: 'POST', body: { host: state.hostCode, question_id: qid, duration: 180 } });
-        if (res) alert('Question started. Projector and audience will update.');
-      } else {
-        alert('Started (local demo). For live multi-device, run the server.');
-      }
+      const type = prompt('Type: yesno, scale, or custom', 'yesno');
+      await api(`/api/host/${state.hostCode}/questions`, { method: 'POST', body: { text, type } });
       await loadQuestions();
       render();
     }
 
-    async function editBranding() {
-      const name = prompt('Name:', state.branding.name);
-      const primary = prompt('Primary color hex:', state.branding.primary);
-      const logo = prompt('Logo URL:', state.branding.logo || '');
-      state.branding = { name: name || state.branding.name, primary: primary || state.branding.primary, logo };
+    async function startQuestion(qid) {
+      try {
+        const res = await api('/api/session', { method: 'POST', body: { host: state.hostCode, question_id: qid, duration: 180 } });
+        alert('Timer started! Projector and audience devices will update.');
+        await loadQuestions();
+        render();
+      } catch (e) {
+        alert('Could not start question. Check that the server is running.');
+        console.error(e);
+      }
+    }
+
+    function editBranding() {
+      const name = prompt('Room name:', state.branding.name);
+      const logo = prompt('Logo URL (optional):', state.branding.logo || '');
+      const color = prompt('Primary color (hex, e.g. #3b82f6):', state.branding.primary);
+      if (name) state.branding.name = name;
+      if (logo !== null) state.branding.logo = logo;
+      if (color) state.branding.primary = color;
       saveLocal();
-      if (API) await api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding });
+      api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding }).catch(() => {});
       render();
     }
 
-    async function pollProjector() {
-      // Simple polling placeholder; full version would poll /api/session
+    async function pollLive() {
+      if (!state.hostCode) return;
       setInterval(async () => {
-        // In production poll active session for this host
+        // placeholder
       }, 2000);
     }
 
-    async function pollAudience() {
-      setInterval(async () => {
-        // Poll for active session and render answer buttons
-      }, 2000);
-    }
-
-    // Boot
     const params = new URLSearchParams(location.search);
     if (params.get('projector')) {
       state.hostCode = params.get('code') || '';
