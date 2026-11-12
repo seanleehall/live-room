@@ -9,6 +9,7 @@
   <style>
     body { font-family: 'Montserrat', system-ui, sans-serif; background: #f3eee4; color: #141210; }
     .card { background: #fffdf9; border: 1px solid #e6dfd0; }
+    input, textarea { background: white; border: 1px solid #e6dfd0; }
   </style>
 </head>
 <body class="min-h-screen">
@@ -22,7 +23,9 @@
       questions: [],
       live: null,
       statusMsg: '',
-      answered: false
+      answered: false,
+      showBrand: false,
+      showAdd: false
     };
     let pollTimer, tickTimer;
 
@@ -87,7 +90,7 @@
       if (!live || !live.active) return '';
       const results = live.results || {};
       const total = Object.values(results).reduce((a,b) => a + b, 0) || 0;
-      const opts = live.type === 'yesno' ? ['Yes','No'] : (Object.keys(results).length ? Object.keys(results) : ['1','2','3','4','5']);
+      const opts = live.type === 'yesno' ? ['Yes','No'] : (live.options ? live.options.split('|') : Object.keys(results).length ? Object.keys(results) : ['1','2','3','4','5']);
       return opts.map(opt => {
         const count = results[opt] || 0;
         const pct = total ? Math.round((count / total) * 100) : 0;
@@ -127,21 +130,9 @@
               <h1 class="text-5xl font-bold mb-2" style="color:${primary}">pollme.live</h1>
               <p class="text-xl text-stone-600 mb-10">Ask questions. See the room answer. No log-in needed.</p>
               <div class="grid md:grid-cols-3 gap-6 mb-10 text-left">
-                <div class="card rounded-2xl p-6">
-                  <div class="text-3xl font-bold mb-2" style="color:${primary}">1</div>
-                  <h3 class="font-semibold text-lg mb-1">Ask questions</h3>
-                  <p class="text-sm text-stone-600">From the host desk, choose or create a question and start the clock.</p>
-                </div>
-                <div class="card rounded-2xl p-6">
-                  <div class="text-3xl font-bold mb-2" style="color:${primary}">2</div>
-                  <h3 class="font-semibold text-lg mb-1">See the room answer</h3>
-                  <p class="text-sm text-stone-600">Results appear live on the projector as people respond.</p>
-                </div>
-                <div class="card rounded-2xl p-6">
-                  <div class="text-3xl font-bold mb-2" style="color:${primary}">3</div>
-                  <h3 class="font-semibold text-lg mb-1">No log-in needed</h3>
-                  <p class="text-sm text-stone-600">Everyone scans the code and answers on their phone. No accounts.</p>
-                </div>
+                <div class="card rounded-2xl p-6"><div class="text-3xl font-bold mb-2" style="color:${primary}">1</div><h3 class="font-semibold text-lg mb-1">Ask questions</h3><p class="text-sm text-stone-600">From the host desk, choose or create a question and start the clock.</p></div>
+                <div class="card rounded-2xl p-6"><div class="text-3xl font-bold mb-2" style="color:${primary}">2</div><h3 class="font-semibold text-lg mb-1">See the room answer</h3><p class="text-sm text-stone-600">Results appear live on the projector as people respond.</p></div>
+                <div class="card rounded-2xl p-6"><div class="text-3xl font-bold mb-2" style="color:${primary}">3</div><h3 class="font-semibold text-lg mb-1">No log-in needed</h3><p class="text-sm text-stone-600">Everyone scans the code and answers on their phone. No accounts.</p></div>
               </div>
               <div class="space-y-3 max-w-sm mx-auto">
                 <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
@@ -162,9 +153,19 @@
               </div>
               <div class="flex gap-2">
                 <button onclick="openProjector()" class="px-4 py-2 rounded-lg bg-stone-200 text-sm">Open projector</button>
-                <button onclick="editBranding()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Branding</button>
+                <button onclick="toggleBrand()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Change To Your Brand</button>
               </div>
             </header>
+            ${state.showBrand ? `
+            <section class="card rounded-2xl p-6 mb-6">
+              <h2 class="font-semibold mb-4">Change To Your Brand</h2>
+              <label class="block text-sm mb-1">Room name</label>
+              <input id="brandName" class="w-full p-2 rounded mb-3" value="${name}" />
+              <label class="block text-sm mb-1">Upload your company logo to change the theme</label>
+              <input id="brandLogo" type="file" accept="image/*" class="mb-3" />
+              <button onclick="saveBrand()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save</button>
+              <button onclick="toggleBrand()" class="ml-2 px-4 py-2 rounded-lg bg-stone-200 text-sm">Cancel</button>
+            </section>` : ''}
             <div class="grid lg:grid-cols-2 gap-6">
               <section class="card rounded-2xl p-6">
                 <div class="flex justify-between items-center mb-4">
@@ -173,8 +174,16 @@
                 </div>
                 <div class="space-y-3 mb-6">${renderQList()}</div>
                 <div id="status" class="text-sm font-medium text-green-700 mb-4">${state.statusMsg || ''}</div>
-                <h3 class="font-semibold text-sm mb-3">Add to the library</h3>
-                <button onclick="addQuestion()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">+ New question</button>
+                <button onclick="toggleAdd()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">+ New question</button>
+                ${state.showAdd ? `
+                <div class="mt-4 p-4 bg-stone-50 rounded-xl border">
+                  <label class="block text-sm mb-1">Question</label>
+                  <textarea id="qText" class="w-full p-2 rounded mb-3" rows="2" placeholder="What do you want to ask?"></textarea>
+                  <label class="block text-sm mb-1">Answers (one per line)</label>
+                  <textarea id="qAnswers" class="w-full p-2 rounded mb-3" rows="4" placeholder="Yes\nNo">Yes\nNo</textarea>
+                  <button onclick="saveQuestion()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save question</button>
+                  <button onclick="toggleAdd()" class="ml-2 px-4 py-2 rounded-lg bg-stone-200 text-sm">Cancel</button>
+                </div>` : ''}
               </section>
               <section class="card rounded-2xl p-6">
                 <h2 class="font-semibold uppercase tracking-wide text-sm text-stone-500 mb-4">On screen</h2>
@@ -192,11 +201,9 @@
       } else if (state.view === 'projector') {
         app.innerHTML = `
           <div class="min-h-screen flex flex-col p-8">
-            <header class="flex items-center justify-between mb-8">
-              <div class="flex items-center gap-3">
-                ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-16 object-contain" />` : ''}
-                <div class="text-xl font-bold" style="color:${primary}">${name}</div>
-              </div>
+            <header class="flex items-center gap-3 mb-8">
+              ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-16 object-contain" />` : ''}
+              <div class="text-xl font-bold" style="color:${primary}">${name}</div>
             </header>
             <div class="flex-1 flex flex-col items-center justify-center text-center">
               <div id="live-q" class="text-4xl md:text-5xl font-bold mb-4">Waiting for the host to start a question…</div>
@@ -214,11 +221,9 @@
           <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
             <p class="text-xs text-stone-500 mb-2">No sign-in. Tap an answer on this phone.</p>
             <h1 class="text-xl font-bold mb-6" style="color:${primary}">${name}</h1>
-            <div id="aud-area">
-              <div id="live-q" class="text-xl font-semibold mb-2">Waiting for the host to start a question…</div>
-              <div id="timer" class="text-sm text-stone-500 mb-6"></div>
-              <div id="choices"></div>
-            </div>
+            <div id="live-q" class="text-xl font-semibold mb-2">Waiting for the host to start a question…</div>
+            <div id="timer" class="text-sm text-stone-500 mb-6"></div>
+            <div id="choices"></div>
           </div>`;
         startLive();
       }
@@ -232,10 +237,8 @@
         return;
       }
       const primary = state.branding.primary || '#1e3a5f';
-      const opts = state.live.type === 'yesno' ? ['Yes','No'] : ['1','2','3','4','5'];
-      el.innerHTML = opts.map(c =>
-        `<button onclick="submitAnswer('${c}')" class="w-full py-3 rounded-xl text-white font-semibold mb-3" style="background:${primary}">${c}</button>`
-      ).join('');
+      const opts = state.live.options ? state.live.options.split('|') : (state.live.type === 'yesno' ? ['Yes','No'] : ['1','2','3','4','5']);
+      el.innerHTML = opts.map(c => `<button onclick="submitAnswer('${c}')" class="w-full py-3 rounded-xl text-white font-semibold mb-3" style="background:${primary}">${c}</button>`).join('');
     }
 
     function renderQList() {
@@ -248,6 +251,44 @@
           </div>
           <button onclick="startQuestion(${q.id})" class="px-3 py-1.5 rounded-lg text-white text-xs" style="background:${state.branding.primary || '#1e3a5f'}">Start the timer</button>
         </div>`).join('');
+    }
+
+    function toggleBrand() { state.showBrand = !state.showBrand; render(); }
+    function toggleAdd() { state.showAdd = !state.showAdd; render(); }
+
+    async function saveBrand() {
+      const name = document.getElementById('brandName').value.trim();
+      if (name) state.branding.name = name;
+      const file = document.getElementById('brandLogo').files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          state.branding.logo = reader.result;
+          getDominantColor(reader.result, color => {
+            state.branding.primary = color;
+            finishBrand();
+          });
+        };
+        reader.readAsDataURL(file);
+      } else finishBrand();
+    }
+    function finishBrand() {
+      saveLocal();
+      api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding }).finally(() => {
+        state.showBrand = false;
+        render();
+      });
+    }
+
+    async function saveQuestion() {
+      const text = document.getElementById('qText').value.trim();
+      const answers = document.getElementById('qAnswers').value.trim();
+      if (!text) return;
+      const options = answers.split('\n').map(s => s.trim()).filter(Boolean).join('|');
+      await api(`/api/host/${state.hostCode}/questions`, { method: 'POST', body: { text, type: options ? 'custom' : 'yesno', options } });
+      state.showAdd = false;
+      await loadQuestions();
+      render();
     }
 
     async function startHost() {
@@ -267,15 +308,6 @@
     }
 
     function openProjector() { window.open(`/?projector=1&code=${state.hostCode}`, '_blank'); }
-
-    async function addQuestion() {
-      const text = prompt('Question text:');
-      if (!text) return;
-      const type = prompt('Type: yesno or scale', 'yesno');
-      await api(`/api/host/${state.hostCode}/questions`, { method: 'POST', body: { text, type } });
-      await loadQuestions();
-      render();
-    }
 
     async function startQuestion(qid) {
       try {
@@ -300,7 +332,7 @@
     function startLive() {
       if (pollTimer) clearInterval(pollTimer);
       if (tickTimer) clearInterval(tickTimer);
-      pollTimer = setInterval(poll, 2500);
+      pollTimer = setInterval(poll, 2000);
       tickTimer = setInterval(() => {
         if (state.live && state.live.active) {
           state.live.remaining = Math.max(0, state.live.remaining - 1);
@@ -316,45 +348,14 @@
       try {
         const live = await api(`/api/host/${state.hostCode}/current`);
         const wasActive = state.live && state.live.active;
-        state.live = live.active ? live : null;
-        if (state.view === 'audience' && wasActive !== (live && live.active)) renderChoices();
+        if (live.active) {
+          if (!state.live || state.live.session_id !== live.session_id) state.live = live;
+          else state.live.results = live.results;
+        } else state.live = null;
+        if (state.view === 'audience' && wasActive !== !!state.live) renderChoices();
         updateLiveParts();
         if (state.view === 'audience') renderChoices();
       } catch {}
-    }
-
-    function editBranding() {
-      const name = prompt('Room name:', state.branding.name);
-      if (name !== null && name.trim()) state.branding.name = name.trim();
-      const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';
-      overlay.innerHTML = `
-        <div class="bg-white p-8 rounded-2xl text-center max-w-sm mx-4 shadow-xl">
-          <p class="text-lg mb-6">Upload your company logo to change the theme</p>
-          <button id="uploadBtn" class="px-6 py-3 rounded-xl text-white font-semibold" style="background:${state.branding.primary || '#1e3a5f'}">Upload</button>
-          <button id="skipBtn" class="ml-3 px-6 py-3 rounded-xl bg-stone-200">Skip</button>
-        </div>`;
-      document.body.appendChild(overlay);
-      const input = document.createElement('input');
-      input.type = 'file'; input.accept = 'image/*'; input.style.display = 'none';
-      document.getElementById('uploadBtn').onclick = () => input.click();
-      document.getElementById('skipBtn').onclick = () => { document.body.removeChild(overlay); saveAndRefresh(); };
-      input.onchange = (e) => {
-        const file = e.target.files[0];
-        document.body.removeChild(overlay);
-        if (!file) { saveAndRefresh(); return; }
-        const reader = new FileReader();
-        reader.onload = () => {
-          state.branding.logo = reader.result;
-          getDominantColor(reader.result, (color) => { state.branding.primary = color; saveAndRefresh(); });
-        };
-        reader.readAsDataURL(file);
-      };
-      document.body.appendChild(input);
-      function saveAndRefresh() {
-        saveLocal();
-        api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding }).finally(() => render());
-      }
     }
 
     const params = new URLSearchParams(location.search);
