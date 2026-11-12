@@ -4,16 +4,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Live Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Montserrat', system-ui, sans-serif; background: #f3eee4; color: #141210; }
+    .card { background: #fffdf9; border: 1px solid #e6dfd0; }
+  </style>
 </head>
-<body class="bg-slate-900 text-slate-100">
-  <div id="app" class="min-h-screen"></div>
+<body class="min-h-screen">
+  <div id="app"></div>
   <script>
     const API = window.location.origin;
     let state = {
       view: 'home',
       hostCode: localStorage.getItem('hostCode') || '',
-      branding: JSON.parse(localStorage.getItem('branding') || '{"name":"Live Room","primary":"#3b82f6","logo":""}'),
+      branding: JSON.parse(localStorage.getItem('branding') || '{"name":"Live Room","primary":"#1e3a5f","logo":""}'),
       questions: [],
       activeSession: null
     };
@@ -35,12 +40,8 @@
 
     async function loadQuestions() {
       if (!state.hostCode) return;
-      try {
-        state.questions = await api(`/api/host/${state.hostCode}/questions`);
-      } catch (e) {
-        console.error(e);
-        state.questions = [];
-      }
+      try { state.questions = await api(`/api/host/${state.hostCode}/questions`); }
+      catch { state.questions = []; }
     }
 
     function qrSrc(text) {
@@ -53,24 +54,19 @@
       img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = 50;
-        canvas.height = 50;
+        canvas.width = 50; canvas.height = 50;
         ctx.drawImage(img, 0, 0, 50, 50);
         const data = ctx.getImageData(0, 0, 50, 50).data;
         const colors = {};
         for (let i = 0; i < data.length; i += 4) {
           const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
-          if (a < 128) continue;
-          if (r > 240 && g > 240 && b > 240) continue;
-          if (r < 15 && g < 15 && b < 15) continue;
+          if (a < 128 || (r > 240 && g > 240 && b > 240) || (r < 15 && g < 15 && b < 15)) continue;
           const key = `${Math.round(r/16)*16},${Math.round(g/16)*16},${Math.round(b/16)*16}`;
           colors[key] = (colors[key] || 0) + 1;
         }
-        let max = 0, best = '59,130,246';
-        for (const [k, v] of Object.entries(colors)) {
-          if (v > max) { max = v; best = k; }
-        }
-        const [r, g, b] = best.split(',').map(Number);
+        let max = 0, best = '30,58,95';
+        for (const [k, v] of Object.entries(colors)) if (v > max) { max = v; best = k; }
+        const [r,g,b] = best.split(',').map(Number);
         callback('#' + [r,g,b].map(x => x.toString(16).padStart(2,'0')).join(''));
       };
       img.onerror = () => callback(state.branding.primary);
@@ -79,78 +75,81 @@
 
     function render() {
       const app = document.getElementById('app');
-      const primary = state.branding.primary || '#3b82f6';
+      const primary = state.branding.primary || '#1e3a5f';
       const joinUrl = `${window.location.origin}/?join=${state.hostCode}`;
       const qr = qrSrc(joinUrl);
 
       if (state.view === 'home') {
         app.innerHTML = `
-          <div class="max-w-md mx-auto p-8 text-center">
-            <h1 class="text-4xl font-bold mb-2" style="color:${primary}">Live Room</h1>
-            <p class="mb-8 text-slate-400">Ask one question. See the room answer.</p>
-            <div class="space-y-3">
-              <button onclick="startHost()" class="w-full py-3 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
-              <button onclick="joinAudience()" class="w-full py-3 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
+          <div class="min-h-screen flex flex-col items-center justify-center p-6">
+            <div class="text-center max-w-lg">
+              <p class="text-xs tracking-widest uppercase text-stone-500 mb-2">Live room</p>
+              <h1 class="text-4xl font-bold mb-3" style="color:${primary}">Ask one question.<br>See the room answer.</h1>
+              <p class="text-stone-600 mb-8">Put results on the projector. Start a question from the host desk. Phones answer from the code.</p>
+              <div class="space-y-3">
+                <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold text-lg" style="background:${primary}">Host a room</button>
+                <button onclick="joinAudience()" class="w-full py-3.5 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
+              </div>
             </div>
           </div>`;
       } else if (state.view === 'host') {
         app.innerHTML = `
-          <div class="max-w-3xl mx-auto p-6">
-            <header class="flex items-center justify-between mb-8">
-              <div>
-                ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-10 mb-2 object-contain" />` : ''}
-                <h1 class="text-2xl font-bold" style="color:${primary}">${state.branding.name}</h1>
-                <p class="text-sm text-slate-400">Host code: <span class="font-mono font-bold">${state.hostCode}</span></p>
+          <div class="min-h-screen p-6 max-w-4xl mx-auto">
+            <header class="flex items-center justify-between mb-10">
+              <div class="flex items-center gap-4">
+                ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-12 object-contain" />` : ''}
+                <div>
+                  <h1 class="text-2xl font-bold" style="color:${primary}">${state.branding.name}</h1>
+                  <p class="text-sm text-stone-500">Host code <span class="font-mono font-bold">${state.hostCode}</span></p>
+                </div>
               </div>
               <div class="flex gap-2">
-                <button onclick="openProjector()" class="px-4 py-2 rounded-lg bg-slate-700">Projector</button>
+                <button onclick="openProjector()" class="px-4 py-2 rounded-lg bg-stone-200 text-stone-800">Projector</button>
                 <button onclick="editBranding()" class="px-4 py-2 rounded-lg text-white" style="background:${primary}">Branding</button>
               </div>
             </header>
-            <section>
-              <div class="flex justify-between items-center mb-3">
-                <h2 class="text-lg font-semibold">Question library</h2>
-                <button onclick="addQuestion()" class="px-3 py-1.5 rounded-lg text-white text-sm" style="background:${primary}">+ Add</button>
+            <section class="card rounded-2xl p-6 mb-6">
+              <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-semibold">Questions you keep</h2>
+                <button onclick="addQuestion()" class="px-4 py-1.5 rounded-lg text-white text-sm" style="background:${primary}">+ Add</button>
               </div>
-              <div class="space-y-2">${renderQList()}</div>
+              <div class="space-y-3">${renderQList()}</div>
             </section>
-            <div class="mt-8 p-4 bg-slate-800 rounded-xl border border-slate-700 text-center">
-              <p class="text-sm text-slate-400 mb-3">Audience QR code</p>
-              <img src="${qr}" class="mx-auto bg-white p-2 rounded" width="200" height="200" alt="QR code" />
-              <p class="mt-3 font-mono text-sm break-all">${joinUrl}</p>
+            <div class="card rounded-2xl p-6 text-center">
+              <p class="text-sm text-stone-500 mb-3">Scan to answer</p>
+              <img src="${qr}" class="mx-auto rounded-lg" width="180" height="180" alt="QR" />
+              <p class="mt-3 text-xs font-mono text-stone-500 break-all">${joinUrl}</p>
             </div>
           </div>`;
       } else if (state.view === 'projector') {
         app.innerHTML = `
-          <div class="min-h-screen flex flex-col items-center justify-center p-8 text-center text-white" style="background:${primary}">
-            ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-24 mb-6 object-contain bg-white/10 rounded-xl p-2" />` : ''}
+          <div class="min-h-screen flex flex-col items-center justify-center p-8 text-center" style="background:${primary}; color: white;">
+            ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-20 mb-6 object-contain" />` : ''}
             <h1 class="text-5xl font-bold mb-4">${state.branding.name}</h1>
-            <div id="live" class="text-3xl max-w-3xl mb-8">Waiting for the host to start a question…</div>
-            <div class="mt-4">
-              <p class="text-lg mb-2 opacity-80">Scan to join</p>
-              <img src="${qr}" class="mx-auto bg-white p-3 rounded-xl" width="180" height="180" alt="Join QR" />
+            <div id="live" class="text-3xl max-w-3xl mb-10">Waiting for the host to start a question…</div>
+            <div>
+              <p class="text-lg mb-3 opacity-80">Scan to join</p>
+              <img src="${qr}" class="mx-auto bg-white p-3 rounded-xl" width="160" height="160" alt="Join QR" />
             </div>
           </div>`;
-        pollLive();
       } else if (state.view === 'audience') {
         app.innerHTML = `
-          <div class="max-w-md mx-auto p-6 text-center">
+          <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
             <h1 class="text-2xl font-bold mb-4" style="color:${primary}">Answer</h1>
-            <div id="aud">Waiting for the host to start a question…</div>
+            <div id="aud" class="text-stone-600">Waiting for the host to start a question…</div>
           </div>`;
-        pollLive();
       }
     }
 
     function renderQList() {
-      if (!state.questions.length) return '<p class="text-slate-500 italic">No questions yet.</p>';
+      if (!state.questions.length) return '<p class="text-stone-500 italic text-sm">No questions yet.</p>';
       return state.questions.map(q => `
-        <div class="bg-slate-800 border border-slate-700 rounded-xl p-4 flex justify-between items-center">
+        <div class="flex justify-between items-center p-4 rounded-xl bg-stone-50 border border-stone-200">
           <div>
             <div class="font-medium">${q.text}</div>
-            <div class="text-xs text-slate-400">Used ${q.used || 0} times</div>
+            <div class="text-xs text-stone-500">Used ${q.used || 0} times</div>
           </div>
-          <button onclick="startQuestion(${q.id})" class="px-4 py-1.5 rounded-lg text-white text-sm" style="background:${state.branding.primary || '#3b82f6'}">Start timer</button>
+          <button onclick="startQuestion(${q.id})" class="px-4 py-1.5 rounded-lg text-white text-sm" style="background:${state.branding.primary || '#1e3a5f'}">Start</button>
         </div>`).join('');
     }
 
@@ -167,16 +166,10 @@
 
     function joinAudience() {
       const code = new URLSearchParams(location.search).get('join') || prompt('Enter host code:');
-      if (code) {
-        state.hostCode = code.toUpperCase();
-        state.view = 'audience';
-        render();
-      }
+      if (code) { state.hostCode = code.toUpperCase(); state.view = 'audience'; render(); }
     }
 
-    function openProjector() {
-      window.open(`/?projector=1&code=${state.hostCode}`, '_blank');
-    }
+    function openProjector() { window.open(`/?projector=1&code=${state.hostCode}`, '_blank'); }
 
     async function addQuestion() {
       const text = prompt('Question text:');
@@ -190,13 +183,10 @@
     async function startQuestion(qid) {
       try {
         await api('/api/session', { method: 'POST', body: { host: state.hostCode, question_id: qid, duration: 180 } });
-        alert('Timer started! Projector and audience devices will update.');
+        alert('Timer started!');
         await loadQuestions();
         render();
-      } catch (e) {
-        alert('Could not start question. Check that the server is running.');
-        console.error(e);
-      }
+      } catch { alert('Could not start question.'); }
     }
 
     function editBranding() {
@@ -204,25 +194,20 @@
       if (name !== null && name.trim()) state.branding.name = name.trim();
 
       const overlay = document.createElement('div');
-      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:9999';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';
       overlay.innerHTML = `
-        <div class="bg-slate-800 p-8 rounded-2xl text-center max-w-sm mx-4">
+        <div class="bg-white p-8 rounded-2xl text-center max-w-sm mx-4 shadow-xl">
           <p class="text-lg mb-6">Upload your company logo to change the theme</p>
-          <button id="uploadBtn" class="px-6 py-3 rounded-xl text-white font-semibold" style="background:${state.branding.primary || '#3b82f6'}">Upload</button>
-          <button id="skipBtn" class="ml-3 px-6 py-3 rounded-xl bg-slate-600">Skip</button>
+          <button id="uploadBtn" class="px-6 py-3 rounded-xl text-white font-semibold" style="background:${state.branding.primary || '#1e3a5f'}">Upload</button>
+          <button id="skipBtn" class="ml-3 px-6 py-3 rounded-xl bg-stone-200">Skip</button>
         </div>`;
       document.body.appendChild(overlay);
 
       const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.style.display = 'none';
+      input.type = 'file'; input.accept = 'image/*'; input.style.display = 'none';
 
       document.getElementById('uploadBtn').onclick = () => input.click();
-      document.getElementById('skipBtn').onclick = () => {
-        document.body.removeChild(overlay);
-        saveAndRefresh();
-      };
+      document.getElementById('skipBtn').onclick = () => { document.body.removeChild(overlay); saveAndRefresh(); };
 
       input.onchange = (e) => {
         const file = e.target.files[0];
@@ -242,23 +227,13 @@
 
       function saveAndRefresh() {
         saveLocal();
-        api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding })
-          .then(() => alert('Branding saved! Theme updated from your logo.'))
-          .catch(() => alert('Saved locally.'))
-          .finally(() => render());
+        api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding }).finally(() => render());
       }
     }
 
-    async function pollLive() {}
-
     const params = new URLSearchParams(location.search);
-    if (params.get('projector')) {
-      state.hostCode = params.get('code') || '';
-      state.view = 'projector';
-    } else if (params.get('join')) {
-      state.hostCode = params.get('join');
-      state.view = 'audience';
-    }
+    if (params.get('projector')) { state.hostCode = params.get('code') || ''; state.view = 'projector'; }
+    else if (params.get('join')) { state.hostCode = params.get('join'); state.view = 'audience'; }
     render();
   </script>
 </body>
