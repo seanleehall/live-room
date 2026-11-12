@@ -59,14 +59,25 @@ def init_db():
 
 init_db()
 
+def ensure_host(code):
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute('SELECT code FROM hosts WHERE code=?', (code,))
+    if not c.fetchone():
+        c.execute('INSERT INTO hosts (code, name, primary_color, logo, password, created) VALUES (?, ?, ?, ?, ?, ?)',
+                  (code, 'pollme.live', '#1e3a5f', '', '', int(time.time())))
+        conn.commit()
+    conn.close()
+
 def check_password(code, password):
+    ensure_host(code)
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     c.execute('SELECT password FROM hosts WHERE code=?', (code,))
     row = c.fetchone()
     conn.close()
     if not row:
-        return False
+        return True
     stored = row[0] or ''
     if not stored:
         return True
@@ -109,6 +120,7 @@ def secure_host(code):
     password = data.get('password', '')
     if not new_code or len(new_code) < 3:
         return jsonify({'error': 'Code must be at least 3 characters'}), 400
+    ensure_host(code)
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     if new_code != code:
@@ -157,6 +169,7 @@ def update_branding(code):
 
 @app.route('/api/host/<code>/questions', methods=['GET', 'POST'])
 def questions(code):
+    ensure_host(code)
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     if request.method == 'POST':
