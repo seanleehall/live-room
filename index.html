@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Live Room</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 </head>
 <body class="bg-slate-900 text-slate-100">
   <div id="app" class="min-h-screen"></div>
@@ -44,17 +43,15 @@
       }
     }
 
-    function makeQR(text, callback) {
-      if (!window.QRCode) return callback('');
-      QRCode.toDataURL(text, { width: 200, margin: 1, color: { dark: '#000000', light: '#ffffff' } }, (err, url) => {
-        callback(err ? '' : url);
-      });
+    function qrSrc(text) {
+      return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(text)}`;
     }
 
     function render() {
       const app = document.getElementById('app');
       const primary = state.branding.primary || '#3b82f6';
       const joinUrl = `${window.location.origin}/?join=${state.hostCode}`;
+      const qr = qrSrc(joinUrl);
 
       if (state.view === 'home') {
         app.innerHTML = `
@@ -89,14 +86,10 @@
             </section>
             <div class="mt-8 p-4 bg-slate-800 rounded-xl border border-slate-700 text-center">
               <p class="text-sm text-slate-400 mb-3">Audience QR code</p>
-              <img id="qrimg" class="mx-auto bg-white p-2 rounded" width="200" height="200" alt="QR code" />
+              <img src="${qr}" class="mx-auto bg-white p-2 rounded" width="200" height="200" alt="QR code" />
               <p class="mt-3 font-mono text-sm break-all">${joinUrl}</p>
             </div>
           </div>`;
-        makeQR(joinUrl, url => {
-          const img = document.getElementById('qrimg');
-          if (img && url) img.src = url;
-        });
       } else if (state.view === 'projector') {
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8 text-center text-white" style="background:${primary}">
@@ -105,13 +98,9 @@
             <div id="live" class="text-3xl max-w-3xl mb-8">Waiting for the host to start a question…</div>
             <div class="mt-4">
               <p class="text-lg mb-2 opacity-80">Scan to join</p>
-              <img id="proj-qr" class="mx-auto bg-white p-3 rounded-xl" width="180" height="180" alt="Join QR" />
+              <img src="${qr}" class="mx-auto bg-white p-3 rounded-xl" width="180" height="180" alt="Join QR" />
             </div>
           </div>`;
-        makeQR(joinUrl, url => {
-          const img = document.getElementById('proj-qr');
-          if (img && url) img.src = url;
-        });
         pollLive();
       } else if (state.view === 'audience') {
         app.innerHTML = `
