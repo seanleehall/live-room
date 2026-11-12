@@ -21,6 +21,13 @@
       0%, 100% { box-shadow: 0 0 8px rgba(34,197,94,0.5); }
       50% { box-shadow: 0 0 16px rgba(34,197,94,0.8); }
     }
+    .support-btn {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .support-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 10px 15px -3px rgb(16 185 129);
+    }
   </style>
 </head>
 <body class="min-h-screen antialiased">
@@ -150,6 +157,17 @@
               <div class="space-y-3">
                 <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
                 <button onclick="joinAudience()" class="w-full py-3.5 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
+              </div>
+
+              <!-- Support / Donation -->
+              <div class="mt-16 pt-8 border-t border-stone-300">
+                <p class="text-stone-500 text-sm mb-4">Loving pollme.live?</p>
+                <div class="flex flex-wrap justify-center gap-3">
+                  <a href="https://venmo.com/seanleehall?txn=pay&amount=3&note=Thanks+for+pollme.live" target="_blank" class="support-btn inline-flex items-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-medium text-sm shadow-sm">$3 ☕</a>
+                  <a href="https://venmo.com/seanleehall?txn=pay&amount=5&note=Thanks+for+pollme.live" target="_blank" class="support-btn inline-flex items-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-medium text-sm shadow-sm">$5 ☕</a>
+                  <a href="https://venmo.com/seanleehall?txn=pay&amount=10&note=Thanks+for+pollme.live" target="_blank" class="support-btn inline-flex items-center px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-medium text-sm shadow-sm">$10 ❤️</a>
+                </div>
+                <p class="text-[10px] text-stone-400 mt-6">Thank you — every coffee keeps the servers running!</p>
               </div>
             </div>
           </div>`;
@@ -390,40 +408,31 @@
     async function poll() {
       if (!state.hostCode) return;
       try {
-        const live = await api(`/api/host/${state.hostCode}/current`);
-        const wasActive = state.live && state.live.active;
-        const wasSession = state.live && state.live.session_id;
-        if (live.question) {
-          if (!state.live || state.live.session_id !== live.session_id) {
-            state.live = live;
-            if (state.view === 'host') render();
-          } else {
-            state.live = live;
-          }
-        } else {
-          state.live = null;
+        const data = await api(`/api/session?host=${state.hostCode}`);
+        if (data) state.live = data;
+        if (state.view === 'host' || state.view === 'projector' || state.view === 'audience') {
+          updateLiveParts();
+          if (state.view === 'audience') renderChoices();
+          else render();
         }
-        if (state.view === 'audience' && (wasActive !== (live && live.active) || wasSession !== (live && live.session_id))) {
-          state.answered = false;
-          renderChoices();
-        }
-        updateLiveParts();
-        if (state.view === 'audience') renderChoices();
-      } catch {}
+      } catch (e) {}
     }
 
-    const params = new URLSearchParams(location.search);
-    if (params.get('projector')) {
-      state.hostCode = params.get('code') || '';
-      state.view = 'projector';
-      loadHostBranding().then(() => render());
-    } else if (params.get('join')) {
-      state.hostCode = params.get('join');
-      state.view = 'audience';
-      loadHostBranding().then(() => render());
-    } else {
-      render();
-    }
+    // Init
+    window.onload = () => {
+      const params = new URLSearchParams(location.search);
+      if (params.has('projector')) {
+        state.hostCode = params.get('code') || '';
+        state.view = 'projector';
+        loadHostBranding().then(() => render());
+      } else if (params.has('join')) {
+        state.hostCode = params.get('join').toUpperCase();
+        state.view = 'audience';
+        loadHostBranding().then(() => render());
+      } else {
+        render();
+      }
+    };
   </script>
 </body>
 </html>
