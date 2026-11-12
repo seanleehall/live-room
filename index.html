@@ -43,7 +43,8 @@
       showBrand: false,
       showAdd: false,
       showAllTime: false,
-      allTime: []
+      allTime: [],
+      newAnswers: []
     };
     let pollTimer;
 
@@ -246,9 +247,17 @@
             </div>
           </div>`;
       } else if (state.view === 'host') {
-        const archivedOptions = state.archived.length
-          ? state.archived.map(q => `<option value="${q.id}">${q.text}</option>`).join('')
-          : '<option value="">No archived questions</option>';
+        const archivedList = state.archived.length
+          ? state.archived.map(q => `
+            <div class="flex items-center justify-between py-2 border-b border-stone-100">
+              <span class="text-sm">${q.text}</span>
+              <div class="flex gap-1">
+                <button onclick="editArchived(${q.id})" class="px-2 py-1 text-xs bg-stone-200 rounded">Edit</button>
+                <button onclick="deleteArchived(${q.id})" class="px-2 py-1 text-xs bg-red-100 text-red-700 rounded">Delete</button>
+                <button onclick="restoreArchived(${q.id})" class="px-2 py-1 text-xs bg-stone-200 rounded">Restore</button>
+              </div>
+            </div>`).join('')
+          : '<p class="text-stone-500 text-sm">No archived questions</p>';
         app.innerHTML = `
           <div class="min-h-screen p-6 max-w-6xl mx-auto">
             <header class="flex items-center justify-between mb-8">
@@ -288,18 +297,21 @@
                 <div class="mt-4 p-5 bg-stone-50 rounded-xl border border-stone-200">
                   <label class="block text-sm mb-1">Question</label>
                   <textarea id="qText" rows="2" class="mb-3" placeholder="What do you want to ask?"></textarea>
-                  <label class="block text-sm mb-1">Answers (one per line)</label>
-                  <textarea id="qAnswers" rows="4" class="mb-3" placeholder="Yes\nNo">Yes\nNo</textarea>
+                  <label class="block text-sm mb-2">Answers</label>
+                  <div id="answerList" class="space-y-2 mb-3">
+                    ${state.newAnswers.map((a, i) => `<div class="flex gap-2"><input value="${a.replace(/"/g,'"')}" onchange="updateAnswer(${i}, this.value)" class="flex-1" /><button onclick="removeAnswer(${i})" class="px-3 bg-stone-200 rounded text-sm">×</button></div>`).join('')}
+                  </div>
+                  <div class="flex gap-2 mb-3">
+                    <input id="newAnswerInput" placeholder="Add an answer" class="flex-1" onkeydown="if(event.key==='Enter') addAnswer()" />
+                    <button onclick="addAnswer()" class="px-4 py-2 bg-stone-200 rounded text-sm">Add</button>
+                  </div>
                   <button onclick="saveQuestion()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save question</button>
                   <button onclick="toggleAdd()" class="ml-2 px-4 py-2 rounded-lg bg-stone-200 text-sm">Cancel</button>
                   <div id="qError" class="text-sm text-red-600 mt-2"></div>
                 </div>` : ''}
                 <div class="mt-6 pt-4 border-t border-stone-200">
-                  <label class="block text-sm font-medium mb-1">Archived questions</label>
-                  <select id="archivedSelect" class="mb-2">
-                    ${archivedOptions}
-                  </select>
-                  <button onclick="restoreArchived()" class="px-4 py-2 rounded-lg bg-stone-200 text-sm">Restore selected</button>
+                  <h3 class="text-sm font-medium mb-2">Archived questions</h3>
+                  ${archivedList}
                 </div>
               </section>
               <section class="card">
@@ -402,7 +414,24 @@
     }
 
     function toggleBrand() { state.showBrand = !state.showBrand; render(); }
-    function toggleAdd() { state.showAdd = !state.showAdd; render(); }
+    function toggleAdd() {
+      state.showAdd = !state.showAdd;
+      if (state.showAdd) state.newAnswers = [];
+      render();
+    }
+    function addAnswer() {
+      const input = document.getElementById('newAnswerInput');
+      const val = input && input.value.trim();
+      if (val) {
+        state.newAnswers.push(val);
+        render();
+      }
+    }
+    function updateAnswer(i, val) { state.newAnswers[i] = val; }
+    function removeAnswer(i) {
+      state.newAnswers.splice(i, 1);
+      render();
+    }
     async function toggleAllTime() {
       state.showAllTime = !state.showAllTime;
       if (state.showAllTime) await loadAllTime();
@@ -480,19 +509,23 @@
 
     async function saveQuestion() {
       const text = document.getElementById('qText').value.trim();
-      const answers = document.getElementById('qAnswers').value.trim();
       const errEl = document.getElementById('qError');
       if (!text) {
         if (errEl) errEl.textContent = 'Please enter a question.';
         return;
       }
-      const options = answers.split('\n').map(s => s.trim()).filter(Boolean).join('|');
+      if (!state.newAnswers.length) {
+        if (errEl) errEl.textContent = 'Please add at least one answer.';
+        return;
+      }
+      const options = state.newAnswers.filter(Boolean).join('|');
       try {
         await api(`/api/host/${state.hostCode}/questions`, {
           method: 'POST',
-          body: { text, type: options ? 'custom' : 'yesno', options, password: state.hostPassword }
+          body: { text, type: 'custom', options, password: state.hostPassword }
         });
         state.showAdd = false;
+        state.newAnswers = [];
         state.statusMsg = 'Question saved.';
         await loadQuestions();
         render();
@@ -510,12 +543,37 @@
       } catch {}
     }
 
-    async function restoreArchived() {
-      const sel = document.getElementById('archivedSelect');
-      const qid = sel && sel.value;
+    async function restoreArchived(qid) {
       if (!qid) return;
       try {
         await api(`/api/host/${state.hostCode}/questions/${qid}/archive`, { method: 'POST', body: { archived: false, password: state.hostPassword } });
+        await loadQuestions();
+        render();
+      } catch {}
+    }
+
+    async function deleteArchived(qid) {
+      if (!confirm('Delete this question permanently?')) return;
+      try {
+        await api(`/api/host/${state.hostCode}/questions/${qid}`, { method: 'DELETE', body: { password: state.hostPassword } });
+        await loadQuestions();
+        render();
+      } catch {}
+    }
+
+    async function editArchived(qid) {
+      const q = state.archived.find(x => x.id === qid);
+      if (!q) return;
+      const newText = prompt('Edit question:', q.text);
+      if (newText === null) return;
+      const newOpts = prompt('Edit answers (one per line):', (q.options || '').split('|').join('\n'));
+      if (newOpts === null) return;
+      const options = newOpts.split('\n').map(s => s.trim()).filter(Boolean).join('|');
+      try {
+        await api(`/api/host/${state.hostCode}/questions/${qid}`, {
+          method: 'PUT',
+          body: { text: newText, options, type: 'custom', password: state.hostPassword }
+        });
         await loadQuestions();
         render();
       } catch {}
