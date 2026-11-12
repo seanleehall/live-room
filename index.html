@@ -74,6 +74,12 @@
       img.src = imgSrc;
     }
 
+    function fmtTime(sec) {
+      const m = Math.floor(sec / 60);
+      const s = sec % 60;
+      return `${m}:${s.toString().padStart(2,'0')}`;
+    }
+
     function render() {
       const app = document.getElementById('app');
       const primary = state.branding.primary || '#1e3a5f';
@@ -83,91 +89,142 @@
 
       if (state.view === 'home') {
         app.innerHTML = `
-          <div class="min-h-screen flex flex-col items-center justify-center p-6">
-            <div class="text-center max-w-lg">
-              <p class="text-xs tracking-widest uppercase text-stone-500 mb-2">Live room</p>
-              <h1 class="text-4xl font-bold mb-1" style="color:${primary}">pollme.live</h1>
-              <p class="text-2xl font-semibold mb-6" style="color:${primary}">Ask one question. See the room answer.</p>
-              <p class="text-stone-600 mb-8">Put results on the projector. Start a question from the host desk. Phones answer from the code.</p>
-              <div class="space-y-3">
-                <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold text-lg" style="background:${primary}">Host a room</button>
+          <div class="min-h-screen flex flex-col items-center justify-center p-8">
+            <div class="text-center max-w-3xl w-full">
+              <p class="text-xs tracking-[0.2em] uppercase text-stone-500 mb-3">Live room</p>
+              <h1 class="text-5xl font-bold mb-2" style="color:${primary}">pollme.live</h1>
+              <p class="text-xl text-stone-600 mb-10">Ask one question. See the room answer.</p>
+              <div class="grid md:grid-cols-3 gap-6 mb-10 text-left">
+                <div class="card rounded-2xl p-6">
+                  <div class="text-3xl font-bold mb-2" style="color:${primary}">1</div>
+                  <h3 class="font-semibold text-lg mb-1">Projector</h3>
+                  <p class="text-sm text-stone-600">Open the live screen so the room can watch results come in.</p>
+                </div>
+                <div class="card rounded-2xl p-6">
+                  <div class="text-3xl font-bold mb-2" style="color:${primary}">2</div>
+                  <h3 class="font-semibold text-lg mb-1">Three minutes</h3>
+                  <p class="text-sm text-stone-600">From the host desk, choose a saved question and start the clock.</p>
+                </div>
+                <div class="card rounded-2xl p-6">
+                  <div class="text-3xl font-bold mb-2" style="color:${primary}">3</div>
+                  <h3 class="font-semibold text-lg mb-1">The room</h3>
+                  <p class="text-sm text-stone-600">Everyone scans the code. Answers count only while the timer runs.</p>
+                </div>
+              </div>
+              <div class="space-y-3 max-w-sm mx-auto">
+                <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
                 <button onclick="joinAudience()" class="w-full py-3.5 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
               </div>
             </div>
           </div>`;
       } else if (state.view === 'host') {
         app.innerHTML = `
-          <div class="min-h-screen p-6 max-w-4xl mx-auto">
-            <header class="flex items-center justify-between mb-10">
-              <div class="flex items-center gap-4">
-                ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-12 object-contain" />` : ''}
+          <div class="min-h-screen p-6 max-w-6xl mx-auto">
+            <header class="flex items-center justify-between mb-8">
+              <div class="flex items-center gap-3">
+                ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-10 object-contain" />` : ''}
                 <div>
-                  <h1 class="text-2xl font-bold" style="color:${primary}">${name}</h1>
-                  <p class="text-sm text-stone-500">Host code <span class="font-mono font-bold">${state.hostCode}</span></p>
+                  <h1 class="text-xl font-bold" style="color:${primary}">${name}</h1>
+                  <p class="text-xs text-stone-500">Live room · Host code <span class="font-mono font-bold">${state.hostCode}</span></p>
                 </div>
               </div>
               <div class="flex gap-2">
-                <button onclick="openProjector()" class="px-4 py-2 rounded-lg bg-stone-200 text-stone-800">Projector</button>
-                <button onclick="editBranding()" class="px-4 py-2 rounded-lg text-white" style="background:${primary}">Branding</button>
+                <button onclick="openProjector()" class="px-4 py-2 rounded-lg bg-stone-200 text-sm">Open projector</button>
+                <button onclick="editBranding()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Branding</button>
               </div>
             </header>
-            <section class="card rounded-2xl p-6 mb-6">
-              <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold">Questions you keep</h2>
-                <button onclick="addQuestion()" class="px-4 py-1.5 rounded-lg text-white text-sm" style="background:${primary}">+ Add</button>
-              </div>
-              <div class="space-y-3">${renderQList()}</div>
-              ${state.statusMsg ? `<p class="mt-4 text-sm font-medium text-green-700">${state.statusMsg}</p>` : ''}
-            </section>
-            <div class="card rounded-2xl p-6 text-center">
-              <p class="text-sm text-stone-500 mb-3">Scan to answer</p>
-              <img src="${qr}" class="mx-auto rounded-lg" width="180" height="180" alt="QR" />
-              <p class="mt-3 text-xs font-mono text-stone-500 break-all">${joinUrl}</p>
+            <div class="grid lg:grid-cols-2 gap-6">
+              <section class="card rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                  <h2 class="font-semibold uppercase tracking-wide text-sm text-stone-500">Library</h2>
+                  <span class="text-xs text-stone-400">${state.questions.length} ready</span>
+                </div>
+                <div class="space-y-3 mb-6">${renderQList()}</div>
+                ${state.statusMsg ? `<p class="text-sm font-medium text-green-700 mb-4">${state.statusMsg}</p>` : ''}
+                <h3 class="font-semibold text-sm mb-3">Add to the library</h3>
+                <button onclick="addQuestion()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">+ New question</button>
+              </section>
+              <section class="card rounded-2xl p-6">
+                <h2 class="font-semibold uppercase tracking-wide text-sm text-stone-500 mb-4">On screen</h2>
+                ${state.live && state.live.active ? `
+                  <div class="text-2xl font-bold mb-2">${state.live.question}</div>
+                  <div class="text-lg text-stone-600 mb-4">${fmtTime(state.live.remaining)}</div>
+                  <div class="space-y-2">${renderResults(state.live)}</div>
+                ` : `<p class="text-stone-500">No question on screen.</p>`}
+                <div class="mt-6 text-center">
+                  <p class="text-xs text-stone-500 mb-2">Scan to answer</p>
+                  <img src="${qr}" class="mx-auto rounded" width="140" height="140" alt="QR" />
+                </div>
+              </section>
             </div>
           </div>`;
+        startPolling();
       } else if (state.view === 'projector') {
         const liveHtml = state.live && state.live.active
-          ? `<div class="text-4xl font-bold mb-4">${state.live.question}</div>
-             <div class="text-2xl mb-6">${state.live.remaining}s left</div>
-             <div class="text-xl">${Object.entries(state.live.results || {}).map(([k,v]) => `${k}: ${v}`).join(' · ') || 'Waiting for answers…'}</div>`
-          : `<div class="text-3xl">Waiting for the host to start a question…</div>`;
+          ? `<div class="text-4xl md:text-5xl font-bold mb-4">${state.live.question}</div>
+             <div class="text-3xl font-medium mb-8">${fmtTime(state.live.remaining)}</div>
+             <div class="w-full max-w-xl space-y-3">${renderResults(state.live, true)}</div>`
+          : `<div class="text-3xl text-stone-600">Waiting for the host to start a question…</div>`;
         app.innerHTML = `
-          <div class="min-h-screen flex flex-col items-center justify-center p-8 text-center" style="background:${primary}; color: white;">
-            ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-32 mb-8 object-contain" />` : ''}
-            <h1 class="text-5xl font-bold mb-6">${name}</h1>
-            <div id="live" class="max-w-3xl">${liveHtml}</div>
-            <div class="mt-10">
-              <p class="text-lg mb-3 opacity-80">Scan to join</p>
-              <img src="${qr}" class="mx-auto bg-white p-3 rounded-xl" width="160" height="160" alt="Join QR" />
+          <div class="min-h-screen flex flex-col p-8">
+            <header class="flex items-center justify-between mb-8">
+              <div class="flex items-center gap-3">
+                ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-16 object-contain" />` : ''}
+                <div>
+                  <div class="text-xl font-bold" style="color:${primary}">${name}</div>
+                  <div class="text-xs tracking-widest uppercase text-stone-500">Live room</div>
+                </div>
+              </div>
+            </header>
+            <div class="flex-1 flex flex-col items-center justify-center text-center">
+              ${liveHtml}
+            </div>
+            <div class="mt-8 text-center">
+              <p class="text-sm text-stone-500 mb-2">Scan to answer · Join before time runs out</p>
+              <img src="${qr}" class="mx-auto bg-white p-2 rounded-lg" width="140" height="140" alt="QR" />
             </div>
           </div>`;
         startPolling();
       } else if (state.view === 'audience') {
         const audHtml = state.live && state.live.active
-          ? `<div class="text-xl font-semibold mb-4">${state.live.question}</div>
-             <div class="text-sm text-stone-500 mb-6">${state.live.remaining}s left</div>
+          ? `<div class="text-xl font-semibold mb-2">${state.live.question}</div>
+             <div class="text-sm text-stone-500 mb-6">${fmtTime(state.live.remaining)} left</div>
              <div class="space-y-3">${(state.live.type === 'yesno' ? ['Yes','No'] : ['1','2','3','4','5']).map(c =>
                `<button onclick="submitAnswer('${c}')" class="w-full py-3 rounded-xl text-white font-semibold" style="background:${primary}">${c}</button>`
              ).join('')}</div>`
           : `<div class="text-stone-600">Waiting for the host to start a question…</div>`;
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
-            <h1 class="text-2xl font-bold mb-6" style="color:${primary}">${name}</h1>
+            <h1 class="text-xl font-bold mb-6" style="color:${primary}">${name}</h1>
             <div id="aud">${audHtml}</div>
           </div>`;
         startPolling();
       }
     }
 
+    function renderResults(live, large = false) {
+      const results = live.results || {};
+      const total = Object.values(results).reduce((a,b) => a + b, 0) || 1;
+      const opts = live.type === 'yesno' ? ['Yes','No'] : Object.keys(results).length ? Object.keys(results) : ['1','2','3','4','5'];
+      return opts.map(opt => {
+        const count = results[opt] || 0;
+        const pct = Math.round((count / total) * 100);
+        return `<div>
+          <div class="flex justify-between text-sm mb-1"><span>${opt}</span><span>${pct}%</span></div>
+          <div class="h-2 bg-stone-200 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${state.branding.primary || '#1e3a5f'}"></div></div>
+        </div>`;
+      }).join('');
+    }
+
     function renderQList() {
       if (!state.questions.length) return '<p class="text-stone-500 italic text-sm">No questions yet.</p>';
       return state.questions.map(q => `
-        <div class="flex justify-between items-center p-4 rounded-xl bg-stone-50 border border-stone-200" id="q-${q.id}">
+        <div class="flex justify-between items-center p-3 rounded-xl bg-stone-50 border border-stone-200">
           <div>
-            <div class="font-medium">${q.text}</div>
+            <div class="font-medium text-sm">${q.text}</div>
             <div class="text-xs text-stone-500">Used ${q.used || 0} times</div>
           </div>
-          <button onclick="startQuestion(${q.id})" class="px-4 py-1.5 rounded-lg text-white text-sm" style="background:${state.branding.primary || '#1e3a5f'}">Start</button>
+          <button onclick="startQuestion(${q.id})" class="px-3 py-1.5 rounded-lg text-white text-xs" style="background:${state.branding.primary || '#1e3a5f'}">Start the timer</button>
         </div>`).join('');
     }
 
@@ -192,7 +249,7 @@
     async function addQuestion() {
       const text = prompt('Question text:');
       if (!text) return;
-      const type = prompt('Type: yesno, scale, or custom', 'yesno');
+      const type = prompt('Type: yesno or scale', 'yesno');
       await api(`/api/host/${state.hostCode}/questions`, { method: 'POST', body: { text, type } });
       await loadQuestions();
       render();
