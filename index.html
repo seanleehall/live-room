@@ -62,7 +62,10 @@
         ...opts,
         body: opts.body ? JSON.stringify(opts.body) : undefined
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      }
       return res.json();
     }
 
@@ -287,6 +290,7 @@
                   <textarea id="qAnswers" rows="4" class="mb-3" placeholder="Yes\nNo">Yes\nNo</textarea>
                   <button onclick="saveQuestion()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save question</button>
                   <button onclick="toggleAdd()" class="ml-2 px-4 py-2 rounded-lg bg-stone-200 text-sm">Cancel</button>
+                  <div id="qError" class="text-sm text-red-600 mt-2"></div>
                 </div>` : ''}
                 <div class="mt-6 pt-4 border-t border-stone-200">
                   <label class="block text-sm font-medium mb-1">Archived questions</label>
@@ -475,12 +479,25 @@
     async function saveQuestion() {
       const text = document.getElementById('qText').value.trim();
       const answers = document.getElementById('qAnswers').value.trim();
-      if (!text) return;
+      const errEl = document.getElementById('qError');
+      if (!text) {
+        if (errEl) errEl.textContent = 'Please enter a question.';
+        return;
+      }
       const options = answers.split('\n').map(s => s.trim()).filter(Boolean).join('|');
-      await api(`/api/host/${state.hostCode}/questions`, { method: 'POST', body: { text, type: options ? 'custom' : 'yesno', options } });
-      state.showAdd = false;
-      await loadQuestions();
-      render();
+      try {
+        await api(`/api/host/${state.hostCode}/questions`, {
+          method: 'POST',
+          body: { text, type: options ? 'custom' : 'yesno', options }
+        });
+        state.showAdd = false;
+        state.statusMsg = 'Question saved.';
+        await loadQuestions();
+        render();
+        setTimeout(() => { state.statusMsg = ''; const s = document.getElementById('status'); if (s) s.textContent = ''; }, 2000);
+      } catch (e) {
+        if (errEl) errEl.textContent = 'Could not save: ' + (e.message || 'Unknown error');
+      }
     }
 
     async function archiveQuestion(qid) {
