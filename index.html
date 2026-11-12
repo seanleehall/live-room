@@ -137,15 +137,10 @@
       if (state.view === 'home') {
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8">
-            <div class="text-center max-w-3xl w-full">
-              <h1 class="text-5xl font-bold mb-2" style="color:${primary}">pollme.live</h1>
+            <div class="text-center max-w-md w-full">
+              <h1 class="text-5xl font-bold mb-3" style="color:${primary}">pollme.live</h1>
               <p class="text-xl text-stone-600 mb-10">Ask questions. See the room answer. No log-in needed.</p>
-              <div class="grid md:grid-cols-3 gap-6 mb-10 text-left">
-                <div class="card"><div class="text-3xl font-bold mb-2" style="color:${primary}">1</div><h3 class="font-semibold text-lg mb-1">Ask questions</h3><p class="text-sm text-stone-600">From the host desk, choose or create a question and start the clock.</p></div>
-                <div class="card"><div class="text-3xl font-bold mb-2" style="color:${primary}">2</div><h3 class="font-semibold text-lg mb-1">See the room answer</h3><p class="text-sm text-stone-600">Results appear live on the projector as people respond.</p></div>
-                <div class="card"><div class="text-3xl font-bold mb-2" style="color:${primary}">3</div><h3 class="font-semibold text-lg mb-1">No log-in needed</h3><p class="text-sm text-stone-600">Everyone scans the code and answers on their phone. No accounts.</p></div>
-              </div>
-              <div class="space-y-3 max-w-sm mx-auto">
+              <div class="space-y-3">
                 <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
                 <button onclick="joinAudience()" class="w-full py-3.5 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
               </div>
@@ -298,7 +293,6 @@
       saveLocal();
       state.showBrand = false;
       render();
-      // Try to sync to server in the background (don't block the UI)
       if (state.hostCode) {
         api(`/api/host/${state.hostCode}/branding`, {
           method: 'POST',
