@@ -48,7 +48,8 @@
       showAllTime: false,
       allTime: [],
       newAnswers: [],
-      draftQuestion: ''
+      draftQuestion: '',
+      editingId: null
     };
     let pollTimer;
 
@@ -263,6 +264,8 @@
               </div>
             </div>`).join('')
           : '<p class="text-stone-500 text-sm">No archived questions</p>';
+        const formTitle = state.editingId ? 'Edit question' : 'New question';
+        const formButton = state.editingId ? 'Update question' : 'Save question';
         app.innerHTML = `
           <div class="min-h-screen p-6 max-w-6xl mx-auto">
             <header class="flex items-center justify-between mb-8">
@@ -300,6 +303,7 @@
                 <button onclick="toggleAdd()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">+ New question</button>
                 ${state.showAdd ? `
                 <div class="mt-4 p-5 bg-stone-50 rounded-xl border border-stone-200">
+                  <h3 class="font-medium mb-3">${formTitle}</h3>
                   <label class="block text-sm mb-1">Question</label>
                   <textarea id="qText" rows="2" class="mb-3" placeholder="What do you want to ask?" oninput="state.draftQuestion = this.value">${state.draftQuestion.replace(/</g,'<').replace(/>/g,'>')}</textarea>
                   <label class="block text-sm mb-2">Answers</label>
@@ -310,7 +314,7 @@
                     <input id="newAnswerInput" placeholder="Add an answer" class="flex-1" onkeydown="if(event.key==='Enter') addAnswer()" />
                     <button onclick="addAnswer()" class="px-4 py-2 bg-stone-200 rounded text-sm">Add</button>
                   </div>
-                  <button onclick="saveQuestion()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save question</button>
+                  <button onclick="saveQuestion()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">${formButton}</button>
                   <button onclick="toggleAdd()" class="ml-2 px-4 py-2 rounded-lg bg-stone-200 text-sm">Cancel</button>
                   <div id="qError" class="text-sm text-red-600 mt-2"></div>
                 </div>` : ''}
@@ -431,6 +435,9 @@
       if (state.showAdd) {
         state.newAnswers = [];
         state.draftQuestion = '';
+        state.editingId = null;
+      } else {
+        state.editingId = null;
       }
       render();
     }
@@ -539,14 +546,22 @@
       }
       const options = state.newAnswers.filter(Boolean).join('|');
       try {
-        await api(`/api/host/${state.hostCode}/questions`, {
-          method: 'POST',
-          body: { text, type: 'custom', options, password: state.hostPassword }
-        });
+        if (state.editingId) {
+          await api(`/api/host/${state.hostCode}/questions/${state.editingId}`, {
+            method: 'PUT',
+            body: { text, options, type: 'custom', password: state.hostPassword }
+          });
+        } else {
+          await api(`/api/host/${state.hostCode}/questions`, {
+            method: 'POST',
+            body: { text, type: 'custom', options, password: state.hostPassword }
+          });
+        }
         state.showAdd = false;
         state.newAnswers = [];
         state.draftQuestion = '';
-        state.statusMsg = 'Question saved.';
+        state.editingId = null;
+        state.statusMsg = state.editingId ? 'Question updated.' : 'Question saved.';
         await loadQuestions();
         render();
         setTimeout(() => { state.statusMsg = ''; const s = document.getElementById('status'); if (s) s.textContent = ''; }, 2000);
@@ -581,22 +596,14 @@
       } catch {}
     }
 
-    async function editArchived(qid) {
+    function editArchived(qid) {
       const q = state.archived.find(x => x.id === qid);
       if (!q) return;
-      const newText = prompt('Edit question:', q.text);
-      if (newText === null) return;
-      const newOpts = prompt('Edit answers (one per line):', (q.options || '').split('|').join('\n'));
-      if (newOpts === null) return;
-      const options = newOpts.split('\n').map(s => s.trim()).filter(Boolean).join('|');
-      try {
-        await api(`/api/host/${state.hostCode}/questions/${qid}`, {
-          method: 'PUT',
-          body: { text: newText, options, type: 'custom', password: state.hostPassword }
-        });
-        await loadQuestions();
-        render();
-      } catch {}
+      state.editingId = qid;
+      state.draftQuestion = q.text;
+      state.newAnswers = (q.options || '').split('|').filter(Boolean);
+      state.showAdd = true;
+      render();
     }
 
     async function saveRoom() {
