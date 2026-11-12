@@ -8,13 +8,13 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { font-family: 'Montserrat', system-ui, sans-serif; background: #f3eee4; color: #141210; }
-    .card { background: #fffdf9; border: 1px solid #e8e0d0; border-radius: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .card { background: #fffdf9; border: 1px solid #e8e0d0; border-radius: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); padding: 1.75rem 1.75rem; }
     button { transition: opacity 0.15s, transform 0.1s; }
     button:hover { opacity: 0.92; }
     button:active { transform: scale(0.98); }
-    input, textarea { background: #fff; border: 1px solid #e6dfd0; border-radius: 0.75rem; padding: 0.6rem 0.8rem; width: 100%; }
+    input, textarea { background: #fff; border: 1px solid #e6dfd0; border-radius: 0.75rem; padding: 0.7rem 0.9rem; width: 100%; }
     input:focus, textarea:focus { outline: 2px solid #1e3a5f33; border-color: #1e3a5f; }
-    .q-item { background: #faf8f4; border: 1px solid #ebe4d6; border-radius: 0.9rem; }
+    .q-item { background: #faf8f4; border: 1px solid #ebe4d6; border-radius: 0.9rem; padding: 1rem 1.1rem; }
     #timer { font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
     img[alt="QR"] { border-radius: 0.75rem; }
   </style>
@@ -137,9 +137,9 @@
               <h1 class="text-5xl font-bold mb-2" style="color:${primary}">pollme.live</h1>
               <p class="text-xl text-stone-600 mb-10">Ask questions. See the room answer. No log-in needed.</p>
               <div class="grid md:grid-cols-3 gap-6 mb-10 text-left">
-                <div class="card p-6"><div class="text-3xl font-bold mb-2" style="color:${primary}">1</div><h3 class="font-semibold text-lg mb-1">Ask questions</h3><p class="text-sm text-stone-600">From the host desk, choose or create a question and start the clock.</p></div>
-                <div class="card p-6"><div class="text-3xl font-bold mb-2" style="color:${primary}">2</div><h3 class="font-semibold text-lg mb-1">See the room answer</h3><p class="text-sm text-stone-600">Results appear live on the projector as people respond.</p></div>
-                <div class="card p-6"><div class="text-3xl font-bold mb-2" style="color:${primary}">3</div><h3 class="font-semibold text-lg mb-1">No log-in needed</h3><p class="text-sm text-stone-600">Everyone scans the code and answers on their phone. No accounts.</p></div>
+                <div class="card"><div class="text-3xl font-bold mb-2" style="color:${primary}">1</div><h3 class="font-semibold text-lg mb-1">Ask questions</h3><p class="text-sm text-stone-600">From the host desk, choose or create a question and start the clock.</p></div>
+                <div class="card"><div class="text-3xl font-bold mb-2" style="color:${primary}">2</div><h3 class="font-semibold text-lg mb-1">See the room answer</h3><p class="text-sm text-stone-600">Results appear live on the projector as people respond.</p></div>
+                <div class="card"><div class="text-3xl font-bold mb-2" style="color:${primary}">3</div><h3 class="font-semibold text-lg mb-1">No log-in needed</h3><p class="text-sm text-stone-600">Everyone scans the code and answers on their phone. No accounts.</p></div>
               </div>
               <div class="space-y-3 max-w-sm mx-auto">
                 <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
@@ -164,7 +164,7 @@
               </div>
             </header>
             ${state.showBrand ? `
-            <section class="card p-6 mb-6">
+            <section class="card mb-6">
               <h2 class="font-semibold mb-4">Change Branding</h2>
               <label class="block text-sm mb-1">Room name</label>
               <input id="brandName" class="mb-3" value="${name}" />
@@ -174,7 +174,7 @@
               <button onclick="toggleBrand()" class="ml-2 px-4 py-2 rounded-lg bg-stone-200 text-sm">Cancel</button>
             </section>` : ''}
             <div class="grid lg:grid-cols-2 gap-6">
-              <section class="card p-6">
+              <section class="card">
                 <div class="flex justify-between items-center mb-4">
                   <h2 class="font-semibold uppercase tracking-wide text-sm text-stone-500">Library</h2>
                   <span class="text-xs text-stone-400">${state.questions.length} ready</span>
@@ -183,7 +183,7 @@
                 <div id="status" class="text-sm font-medium text-green-700 mb-4">${state.statusMsg || ''}</div>
                 <button onclick="toggleAdd()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">+ New question</button>
                 ${state.showAdd ? `
-                <div class="mt-4 p-4 bg-stone-50 rounded-xl border border-stone-200">
+                <div class="mt-4 p-5 bg-stone-50 rounded-xl border border-stone-200">
                   <label class="block text-sm mb-1">Question</label>
                   <textarea id="qText" rows="2" class="mb-3" placeholder="What do you want to ask?"></textarea>
                   <label class="block text-sm mb-1">Answers (one per line)</label>
@@ -192,7 +192,7 @@
                   <button onclick="toggleAdd()" class="ml-2 px-4 py-2 rounded-lg bg-stone-200 text-sm">Cancel</button>
                 </div>` : ''}
               </section>
-              <section class="card p-6">
+              <section class="card">
                 <h2 class="font-semibold uppercase tracking-wide text-sm text-stone-500 mb-4">On screen</h2>
                 <div id="live-q" class="text-2xl font-bold mb-2">Waiting for the host to start a question…</div>
                 <div id="timer" class="text-lg text-stone-600 mb-4"></div>
@@ -251,7 +251,7 @@
     function renderQList() {
       if (!state.questions.length) return '<p class="text-stone-500 italic text-sm">No questions yet.</p>';
       return state.questions.map(q => `
-        <div class="q-item flex justify-between items-center p-3">
+        <div class="q-item flex justify-between items-center">
           <div>
             <div class="font-medium text-sm">${q.text}</div>
             <div class="text-xs text-stone-500">Used ${q.used || 0} times</div>
