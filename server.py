@@ -194,6 +194,26 @@ def questions(code):
         conn.close()
         return jsonify([{'id': r[0], 'text': r[1], 'type': r[2], 'options': r[3], 'used': r[4], 'archived': r[5]} for r in rows])
 
+@app.route('/api/host/<code>/questions/<int:qid>', methods=['PUT', 'DELETE'])
+def manage_question(code, qid):
+    pw = request.headers.get('X-Password') or (request.json or {}).get('password', '')
+    if not check_password(code, pw):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    if request.method == 'DELETE':
+        c.execute('DELETE FROM questions WHERE id=? AND host_code=?', (qid, code))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True})
+    else:
+        data = request.json or {}
+        c.execute('UPDATE questions SET text=?, options=?, qtype=? WHERE id=? AND host_code=?',
+                  (data.get('text'), data.get('options', ''), data.get('type', 'custom'), qid, code))
+        conn.commit()
+        conn.close()
+        return jsonify({'ok': True})
+
 @app.route('/api/host/<code>/alltime', methods=['GET'])
 def alltime_results(code):
     conn = sqlite3.connect(DB)
