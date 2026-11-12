@@ -546,11 +546,11 @@
     }
 
     async function startHost() {
-      if (!state.hostCode) {
-        const res = await api('/api/host', { method: 'POST', body: state.branding });
-        state.hostCode = res.code;
-        saveLocal();
-      }
+      state.hostCode = '';
+      state.hostPassword = '';
+      const res = await api('/api/host', { method: 'POST', body: state.branding });
+      state.hostCode = res.code;
+      saveLocal();
       await loadQuestions();
       state.view = 'host';
       render();
