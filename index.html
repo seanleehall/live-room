@@ -21,13 +21,8 @@
       0%, 100% { box-shadow: 0 0 8px rgba(34,197,94,0.5); }
       50% { box-shadow: 0 0 16px rgba(34,197,94,0.8); }
     }
-    .support-btn {
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .support-btn:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 10px 15px -3px rgb(16 185 129);
-    }
+    .support-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+    .support-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgb(16 185 129); }
   </style>
 </head>
 <body class="min-h-screen antialiased">
@@ -37,19 +32,23 @@
     let state = {
       view: 'home',
       hostCode: localStorage.getItem('hostCode') || '',
+      hostPassword: localStorage.getItem('hostPassword') || '',
       branding: JSON.parse(localStorage.getItem('branding') || '{"name":"pollme.live","primary":"#1e3a5f","logo":""}'),
       questions: [],
       live: null,
       statusMsg: '',
       answered: false,
       showBrand: false,
-      showAdd: false
+      showAdd: false,
+      showSave: false
     };
     let pollTimer;
 
     async function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json' };
+      if (state.hostPassword) headers['X-Password'] = state.hostPassword;
       const res = await fetch(API + path, {
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         ...opts,
         body: opts.body ? JSON.stringify(opts.body) : undefined
       });
@@ -60,6 +59,7 @@
     function saveLocal() {
       try {
         localStorage.setItem('hostCode', state.hostCode);
+        localStorage.setItem('hostPassword', state.hostPassword);
         localStorage.setItem('branding', JSON.stringify(state.branding));
       } catch (e) { console.warn('localStorage full', e); }
     }
@@ -157,9 +157,8 @@
               <div class="space-y-3">
                 <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
                 <button onclick="joinAudience()" class="w-full py-3.5 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
+                <button onclick="resumeRoom()" class="w-full py-3 rounded-xl border font-medium text-stone-600">Resume a saved room</button>
               </div>
-
-              <!-- Support / Donation -->
               <div class="mt-16 pt-8 border-t border-stone-300">
                 <p class="text-stone-500 text-sm mb-4">Loving pollme.live?</p>
                 <div class="flex flex-wrap justify-center gap-3">
@@ -228,6 +227,22 @@
                 </div>
               </section>
             </div>
+            <div class="mt-8 card">
+              <h2 class="font-semibold mb-2">Want to save your questions for future use?</h2>
+              <p class="text-sm text-stone-500 mb-4">No log-in needed. Pick a memorable code and a password so you can come back later.</p>
+              <div class="grid sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-sm mb-1">Memorable host code</label>
+                  <input id="saveCode" value="${state.hostCode}" placeholder="e.g. MYTEAM" />
+                </div>
+                <div>
+                  <label class="block text-sm mb-1">Password</label>
+                  <input id="savePassword" type="password" placeholder="Choose a password" />
+                </div>
+              </div>
+              <button onclick="saveRoom()" class="mt-4 px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save room</button>
+              <div id="saveStatus" class="text-sm mt-2"></div>
+            </div>
           </div>`;
         startLive();
       } else if (state.view === 'projector') {
@@ -286,6 +301,7 @@
           <div class="flex gap-2">
             <button onclick="startQuestion(${q.id})" class="px-3 py-1.5 rounded-lg text-white text-xs ${thisLive ? 'live-glow' : ''}" style="background:${thisLive ? '#16a34a' : (state.branding.primary || '#1e3a5f')}">${thisLive ? 'LIVE' : 'GO LIVE'}</button>
             ${thisLive ? `<button onclick="endQuestion()" class="px-3 py-1.5 rounded-lg text-white text-xs bg-red-600">END</button>` : ''}
+            <button onclick="archiveQuestion(${q.id})" class="px-3 py-1.5 rounded-lg bg-stone-200 text-xs">Archive</button>
           </div>
         </div>`;
       }).join('');
@@ -299,10 +315,8 @@
       const status = document.getElementById('brandStatus');
       if (btn) btn.disabled = true;
       if (status) status.textContent = 'Saving…';
-
       const name = document.getElementById('brandName').value.trim();
       if (name) state.branding.name = name;
-
       const file = document.getElementById('brandLogo').files[0];
       if (file) {
         const reader = new FileReader();
@@ -315,9 +329,7 @@
         };
         reader.onerror = () => applyBrand();
         reader.readAsDataURL(file);
-      } else {
-        applyBrand();
-      }
+      } else applyBrand();
     }
 
     function applyBrand() {
@@ -330,7 +342,8 @@
           body: {
             name: state.branding.name,
             primary: state.branding.primary,
-            logo: state.branding.logo && state.branding.logo.length < 500000 ? state.branding.logo : ''
+            logo: state.branding.logo && state.branding.logo.length < 500000 ? state.branding.logo : '',
+            password: state.hostPassword
           }
         }).catch(() => {});
       }
@@ -347,6 +360,38 @@
       render();
     }
 
+    async function archiveQuestion(qid) {
+      try {
+        await api(`/api/host/${state.hostCode}/questions/${qid}/archive`, { method: 'POST', body: { archived: true } });
+        await loadQuestions();
+        render();
+      } catch {}
+    }
+
+    async function saveRoom() {
+      const code = document.getElementById('saveCode').value.trim().toUpperCase();
+      const password = document.getElementById('savePassword').value;
+      const status = document.getElementById('saveStatus');
+      if (!code || code.length < 3) {
+        if (status) status.textContent = 'Code must be at least 3 characters.';
+        return;
+      }
+      if (!password) {
+        if (status) status.textContent = 'Please choose a password.';
+        return;
+      }
+      try {
+        const res = await api(`/api/host/${state.hostCode}/secure`, { method: 'POST', body: { code, password } });
+        state.hostCode = res.code;
+        state.hostPassword = password;
+        saveLocal();
+        if (status) status.textContent = 'Saved! You can resume with this code and password anytime.';
+        setTimeout(() => render(), 1500);
+      } catch (e) {
+        if (status) status.textContent = e.message || 'Could not save. Code may be taken.';
+      }
+    }
+
     async function startHost() {
       if (!state.hostCode) {
         const res = await api('/api/host', { method: 'POST', body: state.branding });
@@ -356,6 +401,25 @@
       await loadQuestions();
       state.view = 'host';
       render();
+    }
+
+    async function resumeRoom() {
+      const code = prompt('Enter your host code:');
+      if (!code) return;
+      const password = prompt('Enter your password:');
+      if (!password) return;
+      try {
+        await api(`/api/host/${code.toUpperCase()}/auth`, { method: 'POST', body: { password } });
+        state.hostCode = code.toUpperCase();
+        state.hostPassword = password;
+        saveLocal();
+        await loadQuestions();
+        await loadHostBranding();
+        state.view = 'host';
+        render();
+      } catch {
+        alert('Wrong code or password.');
+      }
     }
 
     function joinAudience() {
