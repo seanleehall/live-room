@@ -160,11 +160,11 @@ def questions(code):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
     if request.method == 'POST':
-        pw = request.headers.get('X-Password', '')
+        data = request.json or {}
+        pw = request.headers.get('X-Password') or data.get('password', '')
         if not check_password(code, pw):
             conn.close()
             return jsonify({'error': 'Unauthorized'}), 401
-        data = request.json or {}
         if not data.get('text'):
             conn.close()
             return jsonify({'error': 'Question text required'}), 400
@@ -203,9 +203,10 @@ def alltime_results(code):
 
 @app.route('/api/host/<code>/questions/<int:qid>/archive', methods=['POST'])
 def archive_question(code, qid):
-    if not check_password(code, request.headers.get('X-Password', '')):
-        return jsonify({'error': 'Unauthorized'}), 401
     data = request.json or {}
+    pw = request.headers.get('X-Password') or data.get('password', '')
+    if not check_password(code, pw):
+        return jsonify({'error': 'Unauthorized'}), 401
     archived = 1 if data.get('archived', True) else 0
     conn = sqlite3.connect(DB)
     c = conn.cursor()
@@ -217,7 +218,8 @@ def archive_question(code, qid):
 @app.route('/api/session', methods=['POST'])
 def start_session():
     data = request.json
-    if not check_password(data['host'], request.headers.get('X-Password', '')):
+    pw = request.headers.get('X-Password') or data.get('password', '')
+    if not check_password(data['host'], pw):
         return jsonify({'error': 'Unauthorized'}), 401
     sid = str(uuid.uuid4())[:8]
     conn = sqlite3.connect(DB)
@@ -233,7 +235,8 @@ def start_session():
 @app.route('/api/session/end', methods=['POST'])
 def end_session():
     data = request.json
-    if not check_password(data['host'], request.headers.get('X-Password', '')):
+    pw = request.headers.get('X-Password') or data.get('password', '')
+    if not check_password(data['host'], pw):
         return jsonify({'error': 'Unauthorized'}), 401
     conn = sqlite3.connect(DB)
     c = conn.cursor()
