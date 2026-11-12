@@ -44,9 +44,17 @@
       }
     }
 
+    function makeQR(text, callback) {
+      if (!window.QRCode) return callback('');
+      QRCode.toDataURL(text, { width: 200, margin: 1, color: { dark: '#000000', light: '#ffffff' } }, (err, url) => {
+        callback(err ? '' : url);
+      });
+    }
+
     function render() {
       const app = document.getElementById('app');
       const primary = state.branding.primary || '#3b82f6';
+      const joinUrl = `${window.location.origin}/?join=${state.hostCode}`;
 
       if (state.view === 'home') {
         app.innerHTML = `
@@ -79,24 +87,30 @@
               <div class="space-y-2">${renderQList()}</div>
             </section>
             <div class="mt-8 p-4 bg-slate-800 rounded-xl border border-slate-700 text-center">
-              <p class="text-sm text-slate-400 mb-3">Audience link / QR code</p>
-              <canvas id="qr" class="mx-auto bg-white p-2 rounded"></canvas>
-              <p class="mt-3 font-mono text-sm break-all">${window.location.origin}/?join=${state.hostCode}</p>
+              <p class="text-sm text-slate-400 mb-3">Audience QR code</p>
+              <img id="qrimg" class="mx-auto bg-white p-2 rounded" width="200" height="200" alt="QR code" />
+              <p class="mt-3 font-mono text-sm break-all">${joinUrl}</p>
             </div>
           </div>`;
-        setTimeout(() => {
-          const canvas = document.getElementById('qr');
-          if (canvas && window.QRCode) {
-            QRCode.toCanvas(canvas, `${window.location.origin}/?join=${state.hostCode}`, { width: 180, margin: 1 });
-          }
-        }, 100);
+        makeQR(joinUrl, url => {
+          const img = document.getElementById('qrimg');
+          if (img && url) img.src = url;
+        });
       } else if (state.view === 'projector') {
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8 text-center text-white" style="background:${primary}">
             ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-24 mb-6 object-contain bg-white/10 rounded-xl p-2" />` : ''}
-            <h1 class="text-5xl font-bold mb-8">${state.branding.name}</h1>
-            <div id="live" class="text-3xl max-w-3xl">Waiting for the host to start a question…</div>
+            <h1 class="text-5xl font-bold mb-4">${state.branding.name}</h1>
+            <div id="live" class="text-3xl max-w-3xl mb-8">Waiting for the host to start a question…</div>
+            <div class="mt-4">
+              <p class="text-lg mb-2 opacity-80">Scan to join</p>
+              <img id="proj-qr" class="mx-auto bg-white p-3 rounded-xl" width="180" height="180" alt="Join QR" />
+            </div>
           </div>`;
+        makeQR(joinUrl, url => {
+          const img = document.getElementById('proj-qr');
+          if (img && url) img.src = url;
+        });
         pollLive();
       } else if (state.view === 'audience') {
         app.innerHTML = `
@@ -155,7 +169,7 @@
 
     async function startQuestion(qid) {
       try {
-        const res = await api('/api/session', { method: 'POST', body: { host: state.hostCode, question_id: qid, duration: 180 } });
+        await api('/api/session', { method: 'POST', body: { host: state.hostCode, question_id: qid, duration: 180 } });
         alert('Timer started! Projector and audience devices will update.');
         await loadQuestions();
         render();
@@ -167,22 +181,36 @@
 
     function editBranding() {
       const name = prompt('Room name:', state.branding.name);
-      const logo = prompt('Logo URL (optional):', state.branding.logo || '');
       const color = prompt('Primary color (hex, e.g. #3b82f6):', state.branding.primary);
       if (name) state.branding.name = name;
-      if (logo !== null) state.branding.logo = logo;
       if (color) state.branding.primary = color;
-      saveLocal();
-      api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding }).catch(() => {});
-      render();
+
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) {
+          saveAndRefresh();
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          state.branding.logo = reader.result;
+          saveAndRefresh();
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+
+      function saveAndRefresh() {
+        saveLocal();
+        api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding }).catch(() => {});
+        render();
+      }
     }
 
-    async function pollLive() {
-      if (!state.hostCode) return;
-      setInterval(async () => {
-        // placeholder
-      }, 2000);
-    }
+    async function pollLive() {}
 
     const params = new URLSearchParams(location.search);
     if (params.get('projector')) {
