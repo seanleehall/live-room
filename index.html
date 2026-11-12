@@ -21,8 +21,10 @@
       branding: JSON.parse(localStorage.getItem('branding') || '{"name":"pollme.live","primary":"#1e3a5f","logo":""}'),
       questions: [],
       live: null,
-      statusMsg: ''
+      statusMsg: '',
+      answered: false
     };
+    let pollTimer, tickTimer;
 
     async function api(path, opts = {}) {
       const res = await fetch(API + path, {
@@ -75,9 +77,40 @@
     }
 
     function fmtTime(sec) {
+      sec = Math.max(0, Math.floor(sec));
       const m = Math.floor(sec / 60);
       const s = sec % 60;
       return `${m}:${s.toString().padStart(2,'0')}`;
+    }
+
+    function renderResultsHTML(live) {
+      if (!live || !live.active) return '';
+      const results = live.results || {};
+      const total = Object.values(results).reduce((a,b) => a + b, 0) || 0;
+      const opts = live.type === 'yesno' ? ['Yes','No'] : (Object.keys(results).length ? Object.keys(results) : ['1','2','3','4','5']);
+      return opts.map(opt => {
+        const count = results[opt] || 0;
+        const pct = total ? Math.round((count / total) * 100) : 0;
+        return `<div class="mb-3">
+          <div class="flex justify-between text-sm mb-1"><span>${opt}</span><span>${pct}% · ${count}</span></div>
+          <div class="h-3 bg-stone-200 rounded-full overflow-hidden"><div class="h-full rounded-full transition-all duration-500" style="width:${pct}%;background:${state.branding.primary || '#1e3a5f'}"></div></div>
+        </div>`;
+      }).join('');
+    }
+
+    function updateLiveParts() {
+      const timerEl = document.getElementById('timer');
+      const resultsEl = document.getElementById('results');
+      const qEl = document.getElementById('live-q');
+      if (!state.live || !state.live.active) {
+        if (timerEl) timerEl.textContent = '';
+        if (resultsEl) resultsEl.innerHTML = '';
+        if (qEl) qEl.textContent = 'Waiting for the host to start a question…';
+        return;
+      }
+      if (qEl) qEl.textContent = state.live.question;
+      if (timerEl) timerEl.textContent = fmtTime(state.live.remaining);
+      if (resultsEl) resultsEl.innerHTML = renderResultsHTML(state.live);
     }
 
     function render() {
@@ -139,17 +172,15 @@
                   <span class="text-xs text-stone-400">${state.questions.length} ready</span>
                 </div>
                 <div class="space-y-3 mb-6">${renderQList()}</div>
-                ${state.statusMsg ? `<p class="text-sm font-medium text-green-700 mb-4">${state.statusMsg}</p>` : ''}
+                <div id="status" class="text-sm font-medium text-green-700 mb-4">${state.statusMsg || ''}</div>
                 <h3 class="font-semibold text-sm mb-3">Add to the library</h3>
                 <button onclick="addQuestion()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">+ New question</button>
               </section>
               <section class="card rounded-2xl p-6">
                 <h2 class="font-semibold uppercase tracking-wide text-sm text-stone-500 mb-4">On screen</h2>
-                ${state.live && state.live.active ? `
-                  <div class="text-2xl font-bold mb-2">${state.live.question}</div>
-                  <div class="text-lg text-stone-600 mb-4">${fmtTime(state.live.remaining)}</div>
-                  <div class="space-y-2">${renderResults(state.live)}</div>
-                ` : `<p class="text-stone-500">No question on screen.</p>`}
+                <div id="live-q" class="text-2xl font-bold mb-2">Waiting for the host to start a question…</div>
+                <div id="timer" class="text-lg text-stone-600 mb-4"></div>
+                <div id="results"></div>
                 <div class="mt-6 text-center">
                   <p class="text-xs text-stone-500 mb-2">Scan to answer</p>
                   <img src="${qr}" class="mx-auto rounded" width="140" height="140" alt="QR" />
@@ -157,61 +188,54 @@
               </section>
             </div>
           </div>`;
-        startPolling();
+        startLive();
       } else if (state.view === 'projector') {
-        const liveHtml = state.live && state.live.active
-          ? `<div class="text-4xl md:text-5xl font-bold mb-4">${state.live.question}</div>
-             <div class="text-3xl font-medium mb-8">${fmtTime(state.live.remaining)}</div>
-             <div class="w-full max-w-xl space-y-3">${renderResults(state.live, true)}</div>`
-          : `<div class="text-3xl text-stone-600">Waiting for the host to start a question…</div>`;
         app.innerHTML = `
           <div class="min-h-screen flex flex-col p-8">
             <header class="flex items-center justify-between mb-8">
               <div class="flex items-center gap-3">
                 ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-16 object-contain" />` : ''}
-                <div>
-                  <div class="text-xl font-bold" style="color:${primary}">${name}</div>
-                </div>
+                <div class="text-xl font-bold" style="color:${primary}">${name}</div>
               </div>
             </header>
             <div class="flex-1 flex flex-col items-center justify-center text-center">
-              ${liveHtml}
+              <div id="live-q" class="text-4xl md:text-5xl font-bold mb-4">Waiting for the host to start a question…</div>
+              <div id="timer" class="text-3xl font-medium mb-8"></div>
+              <div id="results" class="w-full max-w-xl"></div>
             </div>
             <div class="mt-8 text-center">
               <p class="text-sm text-stone-500 mb-2">Scan to answer · Join before time runs out</p>
               <img src="${qr}" class="mx-auto bg-white p-2 rounded-lg" width="140" height="140" alt="QR" />
             </div>
           </div>`;
-        startPolling();
+        startLive();
       } else if (state.view === 'audience') {
-        const audHtml = state.live && state.live.active
-          ? `<div class="text-xl font-semibold mb-2">${state.live.question}</div>
-             <div class="text-sm text-stone-500 mb-6">${fmtTime(state.live.remaining)} left</div>
-             <div class="space-y-3">${(state.live.type === 'yesno' ? ['Yes','No'] : ['1','2','3','4','5']).map(c =>
-               `<button onclick="submitAnswer('${c}')" class="w-full py-3 rounded-xl text-white font-semibold" style="background:${primary}">${c}</button>`
-             ).join('')}</div>`
-          : `<div class="text-stone-600">Waiting for the host to start a question…</div>`;
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
+            <p class="text-xs text-stone-500 mb-2">No sign-in. Tap an answer on this phone.</p>
             <h1 class="text-xl font-bold mb-6" style="color:${primary}">${name}</h1>
-            <div id="aud">${audHtml}</div>
+            <div id="aud-area">
+              <div id="live-q" class="text-xl font-semibold mb-2">Waiting for the host to start a question…</div>
+              <div id="timer" class="text-sm text-stone-500 mb-6"></div>
+              <div id="choices"></div>
+            </div>
           </div>`;
-        startPolling();
+        startLive();
       }
     }
 
-    function renderResults(live, large = false) {
-      const results = live.results || {};
-      const total = Object.values(results).reduce((a,b) => a + b, 0) || 1;
-      const opts = live.type === 'yesno' ? ['Yes','No'] : Object.keys(results).length ? Object.keys(results) : ['1','2','3','4','5'];
-      return opts.map(opt => {
-        const count = results[opt] || 0;
-        const pct = Math.round((count / total) * 100);
-        return `<div>
-          <div class="flex justify-between text-sm mb-1"><span>${opt}</span><span>${pct}%</span></div>
-          <div class="h-2 bg-stone-200 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${state.branding.primary || '#1e3a5f'}"></div></div>
-        </div>`;
-      }).join('');
+    function renderChoices() {
+      const el = document.getElementById('choices');
+      if (!el || state.view !== 'audience') return;
+      if (!state.live || !state.live.active || state.answered) {
+        el.innerHTML = state.answered ? '<p class="text-green-700 font-medium">Answer recorded. Thanks!</p>' : '';
+        return;
+      }
+      const primary = state.branding.primary || '#1e3a5f';
+      const opts = state.live.type === 'yesno' ? ['Yes','No'] : ['1','2','3','4','5'];
+      el.innerHTML = opts.map(c =>
+        `<button onclick="submitAnswer('${c}')" class="w-full py-3 rounded-xl text-white font-semibold mb-3" style="background:${primary}">${c}</button>`
+      ).join('');
     }
 
     function renderQList() {
@@ -239,7 +263,7 @@
 
     function joinAudience() {
       const code = new URLSearchParams(location.search).get('join') || prompt('Enter host code:');
-      if (code) { state.hostCode = code.toUpperCase(); state.view = 'audience'; render(); }
+      if (code) { state.hostCode = code.toUpperCase(); state.view = 'audience'; state.answered = false; render(); }
     }
 
     function openProjector() { window.open(`/?projector=1&code=${state.hostCode}`, '_blank'); }
@@ -257,39 +281,51 @@
       try {
         await api('/api/session', { method: 'POST', body: { host: state.hostCode, question_id: qid, duration: 180 } });
         state.statusMsg = 'Timer started — projector and phones will update.';
+        const status = document.getElementById('status');
+        if (status) status.textContent = state.statusMsg;
         await loadQuestions();
-        render();
-        setTimeout(() => { state.statusMsg = ''; render(); }, 4000);
-      } catch { state.statusMsg = 'Could not start question.'; render(); }
+        setTimeout(() => { state.statusMsg = ''; const s = document.getElementById('status'); if (s) s.textContent = ''; }, 4000);
+      } catch { state.statusMsg = 'Could not start question.'; }
     }
 
     async function submitAnswer(choice) {
-      if (!state.live || !state.live.session_id) return;
+      if (!state.live || !state.live.session_id || state.answered) return;
       try {
         await api('/api/answer', { method: 'POST', body: { session_id: state.live.session_id, choice } });
-        document.getElementById('aud').innerHTML = '<p class="text-green-700 font-medium">Answer recorded. Thanks!</p>';
+        state.answered = true;
+        renderChoices();
       } catch {}
     }
 
-    let pollTimer;
-    function startPolling() {
+    function startLive() {
       if (pollTimer) clearInterval(pollTimer);
-      pollTimer = setInterval(async () => {
-        if (!state.hostCode) return;
-        try {
-          const live = await api(`/api/host/${state.hostCode}/current`);
-          if (JSON.stringify(live) !== JSON.stringify(state.live)) {
-            state.live = live;
-            render();
-          }
-        } catch {}
-      }, 2000);
+      if (tickTimer) clearInterval(tickTimer);
+      pollTimer = setInterval(poll, 2500);
+      tickTimer = setInterval(() => {
+        if (state.live && state.live.active) {
+          state.live.remaining = Math.max(0, state.live.remaining - 1);
+          updateLiveParts();
+          if (state.live.remaining <= 0) state.live.active = false;
+        }
+      }, 1000);
+      poll();
+    }
+
+    async function poll() {
+      if (!state.hostCode) return;
+      try {
+        const live = await api(`/api/host/${state.hostCode}/current`);
+        const wasActive = state.live && state.live.active;
+        state.live = live.active ? live : null;
+        if (state.view === 'audience' && wasActive !== (live && live.active)) renderChoices();
+        updateLiveParts();
+        if (state.view === 'audience') renderChoices();
+      } catch {}
     }
 
     function editBranding() {
       const name = prompt('Room name:', state.branding.name);
       if (name !== null && name.trim()) state.branding.name = name.trim();
-
       const overlay = document.createElement('div');
       overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999';
       overlay.innerHTML = `
@@ -299,13 +335,10 @@
           <button id="skipBtn" class="ml-3 px-6 py-3 rounded-xl bg-stone-200">Skip</button>
         </div>`;
       document.body.appendChild(overlay);
-
       const input = document.createElement('input');
       input.type = 'file'; input.accept = 'image/*'; input.style.display = 'none';
-
       document.getElementById('uploadBtn').onclick = () => input.click();
       document.getElementById('skipBtn').onclick = () => { document.body.removeChild(overlay); saveAndRefresh(); };
-
       input.onchange = (e) => {
         const file = e.target.files[0];
         document.body.removeChild(overlay);
@@ -313,15 +346,11 @@
         const reader = new FileReader();
         reader.onload = () => {
           state.branding.logo = reader.result;
-          getDominantColor(reader.result, (color) => {
-            state.branding.primary = color;
-            saveAndRefresh();
-          });
+          getDominantColor(reader.result, (color) => { state.branding.primary = color; saveAndRefresh(); });
         };
         reader.readAsDataURL(file);
       };
       document.body.appendChild(input);
-
       function saveAndRefresh() {
         saveLocal();
         api(`/api/host/${state.hostCode}/branding`, { method: 'POST', body: state.branding }).finally(() => render());
