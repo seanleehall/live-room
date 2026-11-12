@@ -91,24 +91,23 @@
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8">
             <div class="text-center max-w-3xl w-full">
-              <p class="text-xs tracking-[0.2em] uppercase text-stone-500 mb-3">Live room</p>
               <h1 class="text-5xl font-bold mb-2" style="color:${primary}">pollme.live</h1>
-              <p class="text-xl text-stone-600 mb-10">Ask one question. See the room answer.</p>
+              <p class="text-xl text-stone-600 mb-10">Ask questions. See the room answer. No log-in needed.</p>
               <div class="grid md:grid-cols-3 gap-6 mb-10 text-left">
                 <div class="card rounded-2xl p-6">
                   <div class="text-3xl font-bold mb-2" style="color:${primary}">1</div>
-                  <h3 class="font-semibold text-lg mb-1">Projector</h3>
-                  <p class="text-sm text-stone-600">Open the live screen so the room can watch results come in.</p>
+                  <h3 class="font-semibold text-lg mb-1">Ask questions</h3>
+                  <p class="text-sm text-stone-600">From the host desk, choose or create a question and start the clock.</p>
                 </div>
                 <div class="card rounded-2xl p-6">
                   <div class="text-3xl font-bold mb-2" style="color:${primary}">2</div>
-                  <h3 class="font-semibold text-lg mb-1">Three minutes</h3>
-                  <p class="text-sm text-stone-600">From the host desk, choose a saved question and start the clock.</p>
+                  <h3 class="font-semibold text-lg mb-1">See the room answer</h3>
+                  <p class="text-sm text-stone-600">Results appear live on the projector as people respond.</p>
                 </div>
                 <div class="card rounded-2xl p-6">
                   <div class="text-3xl font-bold mb-2" style="color:${primary}">3</div>
-                  <h3 class="font-semibold text-lg mb-1">The room</h3>
-                  <p class="text-sm text-stone-600">Everyone scans the code. Answers count only while the timer runs.</p>
+                  <h3 class="font-semibold text-lg mb-1">No log-in needed</h3>
+                  <p class="text-sm text-stone-600">Everyone scans the code and answers on their phone. No accounts.</p>
                 </div>
               </div>
               <div class="space-y-3 max-w-sm mx-auto">
@@ -125,7 +124,7 @@
                 ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-10 object-contain" />` : ''}
                 <div>
                   <h1 class="text-xl font-bold" style="color:${primary}">${name}</h1>
-                  <p class="text-xs text-stone-500">Live room · Host code <span class="font-mono font-bold">${state.hostCode}</span></p>
+                  <p class="text-xs text-stone-500">Host code <span class="font-mono font-bold">${state.hostCode}</span></p>
                 </div>
               </div>
               <div class="flex gap-2">
@@ -172,7 +171,6 @@
                 ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-16 object-contain" />` : ''}
                 <div>
                   <div class="text-xl font-bold" style="color:${primary}">${name}</div>
-                  <div class="text-xs tracking-widest uppercase text-stone-500">Live room</div>
                 </div>
               </div>
             </header>
