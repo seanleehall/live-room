@@ -40,7 +40,8 @@
       answered: false,
       showBrand: false,
       showAdd: false,
-      showSave: false
+      showAllTime: false,
+      allTime: []
     };
     let pollTimer;
 
@@ -68,6 +69,12 @@
       if (!state.hostCode) return;
       try { state.questions = await api(`/api/host/${state.hostCode}/questions`); }
       catch { state.questions = []; }
+    }
+
+    async function loadAllTime() {
+      if (!state.hostCode) return;
+      try { state.allTime = await api(`/api/host/${state.hostCode}/alltime`); }
+      catch { state.allTime = []; }
     }
 
     async function loadHostBranding() {
@@ -126,6 +133,27 @@
       }).join('');
     }
 
+    function renderAllTimeHTML() {
+      if (!state.allTime.length) return '<p class="text-stone-500 text-sm">No past results yet.</p>';
+      return state.allTime.map(q => {
+        const results = q.results || {};
+        const total = Object.values(results).reduce((a,b) => a + b, 0) || 0;
+        const opts = q.options ? q.options.split('|') : Object.keys(results);
+        const bars = opts.map(opt => {
+          const count = results[opt] || 0;
+          const pct = total ? Math.round((count / total) * 100) : 0;
+          return `<div class="mb-2">
+            <div class="flex justify-between text-xs mb-1"><span>${opt}</span><span>${pct}% · ${count}</span></div>
+            <div class="h-2 bg-stone-200 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${state.branding.primary || '#1e3a5f'}"></div></div>
+          </div>`;
+        }).join('');
+        return `<div class="mb-5 pb-4 border-b border-stone-200">
+          <div class="font-medium text-sm mb-2">${q.text}</div>
+          ${bars}
+        </div>`;
+      }).join('');
+    }
+
     function updateLiveParts() {
       const resultsEl = document.getElementById('results');
       const qEl = document.getElementById('live-q');
@@ -153,7 +181,21 @@
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8">
             <div class="text-center max-w-md w-full">
-              <h1 class="text-5xl font-bold mb-10" style="color:${primary}">pollme.live</h1>
+              <h1 class="text-5xl font-bold mb-6" style="color:${primary}">pollme.live</h1>
+              <div class="grid grid-cols-3 gap-4 mb-10 text-sm">
+                <div class="p-4 rounded-2xl bg-white/70 border border-stone-200">
+                  <div class="text-2xl mb-1">1</div>
+                  <div class="font-medium">Ask questions</div>
+                </div>
+                <div class="p-4 rounded-2xl bg-white/70 border border-stone-200">
+                  <div class="text-2xl mb-1">2</div>
+                  <div class="font-medium">See the room answer</div>
+                </div>
+                <div class="p-4 rounded-2xl bg-white/70 border border-stone-200">
+                  <div class="text-2xl mb-1">3</div>
+                  <div class="font-medium">No log-in needed</div>
+                </div>
+              </div>
               <div class="space-y-3">
                 <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold" style="background:${primary}">Host a room</button>
                 <button onclick="joinAudience()" class="w-full py-3.5 rounded-xl border-2 font-semibold" style="border-color:${primary};color:${primary}">Join with code</button>
@@ -217,10 +259,17 @@
                 </div>` : ''}
               </section>
               <section class="card">
-                <h2 class="font-semibold uppercase tracking-wide text-sm text-stone-500 mb-4">On screen</h2>
-                <div id="live-status" class="text-xs font-semibold uppercase tracking-wide text-green-600 mb-1">${isLive ? 'LIVE' : (state.live && state.live.question ? 'Results' : '')}</div>
-                <div id="live-q" class="text-2xl font-bold mb-2">${state.live && state.live.question ? state.live.question : 'Waiting for the host to start a question…'}</div>
-                <div id="results">${state.live && state.live.question ? renderResultsHTML(state.live) : ''}</div>
+                <div class="flex justify-between items-center mb-4">
+                  <h2 class="font-semibold uppercase tracking-wide text-sm text-stone-500">On screen</h2>
+                  <button onclick="toggleAllTime()" class="text-xs px-3 py-1 rounded-lg bg-stone-200">${state.showAllTime ? 'Show live' : 'Show all-time'}</button>
+                </div>
+                ${state.showAllTime ? `
+                  <div id="alltime">${renderAllTimeHTML()}</div>
+                ` : `
+                  <div id="live-status" class="text-xs font-semibold uppercase tracking-wide text-green-600 mb-1">${isLive ? 'LIVE' : (state.live && state.live.question ? 'Results' : '')}</div>
+                  <div id="live-q" class="text-2xl font-bold mb-2">${state.live && state.live.question ? state.live.question : 'Waiting for the host to start a question…'}</div>
+                  <div id="results">${state.live && state.live.question ? renderResultsHTML(state.live) : ''}</div>
+                `}
                 <div class="mt-6 text-center">
                   <p class="text-sm text-stone-500 mb-3">Scan to answer</p>
                   <img src="${qr}" class="mx-auto" width="280" height="280" alt="QR" />
@@ -233,7 +282,8 @@
               <div class="grid sm:grid-cols-2 gap-3">
                 <div>
                   <label class="block text-sm mb-1">Memorable host code</label>
-                  <input id="saveCode" value="${state.hostCode}" placeholder="e.g. MYTEAM" />
+                  <input id="saveCode" value="${state.hostCode}" placeholder="e.g. MYTEAM" oninput="checkCode()" />
+                  <div id="codeStatus" class="text-xs mt-1"></div>
                 </div>
                 <div>
                   <label class="block text-sm mb-1">Password</label>
@@ -309,6 +359,39 @@
 
     function toggleBrand() { state.showBrand = !state.showBrand; render(); }
     function toggleAdd() { state.showAdd = !state.showAdd; render(); }
+    async function toggleAllTime() {
+      state.showAllTime = !state.showAllTime;
+      if (state.showAllTime) await loadAllTime();
+      render();
+    }
+
+    async function checkCode() {
+      const input = document.getElementById('saveCode');
+      const status = document.getElementById('codeStatus');
+      if (!input || !status) return;
+      const code = input.value.trim().toUpperCase();
+      if (!code || code === state.hostCode) {
+        status.textContent = '';
+        return;
+      }
+      if (code.length < 3) {
+        status.textContent = 'At least 3 characters';
+        status.className = 'text-xs mt-1 text-stone-500';
+        return;
+      }
+      try {
+        const res = await api(`/api/host/check/${code}`);
+        if (res.taken) {
+          status.textContent = 'Taken';
+          status.className = 'text-xs mt-1 text-red-600';
+        } else {
+          status.textContent = 'Available';
+          status.className = 'text-xs mt-1 text-green-600';
+        }
+      } catch {
+        status.textContent = '';
+      }
+    }
 
     async function saveBrand() {
       const btn = document.getElementById('saveBrandBtn');
@@ -478,7 +561,7 @@
         if (live.question) {
           if (!state.live || state.live.session_id !== live.session_id) {
             state.live = live;
-            if (state.view === 'host') render();
+            if (state.view === 'host' && !state.showAllTime) render();
           } else {
             state.live = live;
           }
