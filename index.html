@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Live Room</title>
+  <title>pollme.live</title>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
@@ -18,9 +18,10 @@
     let state = {
       view: 'home',
       hostCode: localStorage.getItem('hostCode') || '',
-      branding: JSON.parse(localStorage.getItem('branding') || '{"name":"Live Room","primary":"#1e3a5f","logo":""}'),
+      branding: JSON.parse(localStorage.getItem('branding') || '{"name":"pollme.live","primary":"#1e3a5f","logo":""}'),
       questions: [],
-      activeSession: null
+      live: null,
+      statusMsg: ''
     };
 
     async function api(path, opts = {}) {
@@ -76,6 +77,7 @@
     function render() {
       const app = document.getElementById('app');
       const primary = state.branding.primary || '#1e3a5f';
+      const name = state.branding.name || 'pollme.live';
       const joinUrl = `${window.location.origin}/?join=${state.hostCode}`;
       const qr = qrSrc(joinUrl);
 
@@ -84,7 +86,8 @@
           <div class="min-h-screen flex flex-col items-center justify-center p-6">
             <div class="text-center max-w-lg">
               <p class="text-xs tracking-widest uppercase text-stone-500 mb-2">Live room</p>
-              <h1 class="text-4xl font-bold mb-3" style="color:${primary}">Ask one question.<br>See the room answer.</h1>
+              <h1 class="text-4xl font-bold mb-1" style="color:${primary}">pollme.live</h1>
+              <p class="text-2xl font-semibold mb-6" style="color:${primary}">Ask one question. See the room answer.</p>
               <p class="text-stone-600 mb-8">Put results on the projector. Start a question from the host desk. Phones answer from the code.</p>
               <div class="space-y-3">
                 <button onclick="startHost()" class="w-full py-3.5 rounded-xl text-white font-semibold text-lg" style="background:${primary}">Host a room</button>
@@ -99,7 +102,7 @@
               <div class="flex items-center gap-4">
                 ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-12 object-contain" />` : ''}
                 <div>
-                  <h1 class="text-2xl font-bold" style="color:${primary}">${state.branding.name}</h1>
+                  <h1 class="text-2xl font-bold" style="color:${primary}">${name}</h1>
                   <p class="text-sm text-stone-500">Host code <span class="font-mono font-bold">${state.hostCode}</span></p>
                 </div>
               </div>
@@ -114,6 +117,7 @@
                 <button onclick="addQuestion()" class="px-4 py-1.5 rounded-lg text-white text-sm" style="background:${primary}">+ Add</button>
               </div>
               <div class="space-y-3">${renderQList()}</div>
+              ${state.statusMsg ? `<p class="mt-4 text-sm font-medium text-green-700">${state.statusMsg}</p>` : ''}
             </section>
             <div class="card rounded-2xl p-6 text-center">
               <p class="text-sm text-stone-500 mb-3">Scan to answer</p>
@@ -122,29 +126,43 @@
             </div>
           </div>`;
       } else if (state.view === 'projector') {
+        const liveHtml = state.live && state.live.active
+          ? `<div class="text-4xl font-bold mb-4">${state.live.question}</div>
+             <div class="text-2xl mb-6">${state.live.remaining}s left</div>
+             <div class="text-xl">${Object.entries(state.live.results || {}).map(([k,v]) => `${k}: ${v}`).join(' · ') || 'Waiting for answers…'}</div>`
+          : `<div class="text-3xl">Waiting for the host to start a question…</div>`;
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8 text-center" style="background:${primary}; color: white;">
-            ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-20 mb-6 object-contain" />` : ''}
-            <h1 class="text-5xl font-bold mb-4">${state.branding.name}</h1>
-            <div id="live" class="text-3xl max-w-3xl mb-10">Waiting for the host to start a question…</div>
-            <div>
+            ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-32 mb-8 object-contain" />` : ''}
+            <h1 class="text-5xl font-bold mb-6">${name}</h1>
+            <div id="live" class="max-w-3xl">${liveHtml}</div>
+            <div class="mt-10">
               <p class="text-lg mb-3 opacity-80">Scan to join</p>
               <img src="${qr}" class="mx-auto bg-white p-3 rounded-xl" width="160" height="160" alt="Join QR" />
             </div>
           </div>`;
+        startPolling();
       } else if (state.view === 'audience') {
+        const audHtml = state.live && state.live.active
+          ? `<div class="text-xl font-semibold mb-4">${state.live.question}</div>
+             <div class="text-sm text-stone-500 mb-6">${state.live.remaining}s left</div>
+             <div class="space-y-3">${(state.live.type === 'yesno' ? ['Yes','No'] : ['1','2','3','4','5']).map(c =>
+               `<button onclick="submitAnswer('${c}')" class="w-full py-3 rounded-xl text-white font-semibold" style="background:${primary}">${c}</button>`
+             ).join('')}</div>`
+          : `<div class="text-stone-600">Waiting for the host to start a question…</div>`;
         app.innerHTML = `
-          <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-            <h1 class="text-2xl font-bold mb-4" style="color:${primary}">Answer</h1>
-            <div id="aud" class="text-stone-600">Waiting for the host to start a question…</div>
+          <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
+            <h1 class="text-2xl font-bold mb-6" style="color:${primary}">${name}</h1>
+            <div id="aud">${audHtml}</div>
           </div>`;
+        startPolling();
       }
     }
 
     function renderQList() {
       if (!state.questions.length) return '<p class="text-stone-500 italic text-sm">No questions yet.</p>';
       return state.questions.map(q => `
-        <div class="flex justify-between items-center p-4 rounded-xl bg-stone-50 border border-stone-200">
+        <div class="flex justify-between items-center p-4 rounded-xl bg-stone-50 border border-stone-200" id="q-${q.id}">
           <div>
             <div class="font-medium">${q.text}</div>
             <div class="text-xs text-stone-500">Used ${q.used || 0} times</div>
@@ -183,10 +201,34 @@
     async function startQuestion(qid) {
       try {
         await api('/api/session', { method: 'POST', body: { host: state.hostCode, question_id: qid, duration: 180 } });
-        alert('Timer started!');
+        state.statusMsg = 'Timer started — projector and phones will update.';
         await loadQuestions();
         render();
-      } catch { alert('Could not start question.'); }
+        setTimeout(() => { state.statusMsg = ''; render(); }, 4000);
+      } catch { state.statusMsg = 'Could not start question.'; render(); }
+    }
+
+    async function submitAnswer(choice) {
+      if (!state.live || !state.live.session_id) return;
+      try {
+        await api('/api/answer', { method: 'POST', body: { session_id: state.live.session_id, choice } });
+        document.getElementById('aud').innerHTML = '<p class="text-green-700 font-medium">Answer recorded. Thanks!</p>';
+      } catch {}
+    }
+
+    let pollTimer;
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
+        if (!state.hostCode) return;
+        try {
+          const live = await api(`/api/host/${state.hostCode}/current`);
+          if (JSON.stringify(live) !== JSON.stringify(state.live)) {
+            state.live = live;
+            render();
+          }
+        } catch {}
+      }, 2000);
     }
 
     function editBranding() {
