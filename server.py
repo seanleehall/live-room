@@ -282,7 +282,7 @@ def end_session():
 def current_session(code):
     conn = sqlite3.connect(DB)
     c = conn.cursor()
-    c.execute('''SELECT s.id, s.started, s.duration, s.active, q.text, q.qtype, q.options
+    c.execute('''SELECT s.id, s.started, s.duration, s.active, q.id, q.text, q.qtype, q.options
                  FROM sessions s JOIN questions q ON s.question_id = q.id
                  WHERE s.host_code=? ORDER BY s.started DESC LIMIT 1''', (code,))
     row = c.fetchone()
@@ -297,9 +297,10 @@ def current_session(code):
         'session_id': row[0],
         'started': row[1],
         'duration': row[2],
-        'question': row[4],
-        'type': row[5],
-        'options': row[6],
+        'question_id': row[4],
+        'question': row[5],
+        'type': row[6],
+        'options': row[7],
         'results': counts
     })
 
