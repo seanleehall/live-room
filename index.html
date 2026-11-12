@@ -12,8 +12,8 @@
     button { transition: opacity 0.15s, transform 0.1s; }
     button:hover { opacity: 0.92; }
     button:active { transform: scale(0.98); }
-    input, textarea { background: #fff; border: 1px solid #e6dfd0; border-radius: 0.75rem; padding: 0.7rem 0.9rem; width: 100%; }
-    input:focus, textarea:focus { outline: 2px solid #1e3a5f33; border-color: #1e3a5f; }
+    input, textarea, select { background: #fff; border: 1px solid #e6dfd0; border-radius: 0.75rem; padding: 0.7rem 0.9rem; width: 100%; }
+    input:focus, textarea:focus, select:focus { outline: 2px solid #1e3a5f33; border-color: #1e3a5f; }
     .q-item { background: #faf8f4; border: 1px solid #ebe4d6; border-radius: 0.9rem; padding: 1rem 1.1rem; }
     img[alt="QR"] { border-radius: 0.75rem; }
     .live-glow { animation: glow 1.5s ease-in-out infinite; }
@@ -35,6 +35,7 @@
       hostPassword: localStorage.getItem('hostPassword') || '',
       branding: JSON.parse(localStorage.getItem('branding') || '{"name":"pollme.live","primary":"#1e3a5f","background":"#f3eee4","logo":""}'),
       questions: [],
+      archived: [],
       live: null,
       statusMsg: '',
       answered: false,
@@ -74,8 +75,13 @@
 
     async function loadQuestions() {
       if (!state.hostCode) return;
-      try { state.questions = await api(`/api/host/${state.hostCode}/questions`); }
-      catch { state.questions = []; }
+      try {
+        state.questions = await api(`/api/host/${state.hostCode}/questions`);
+        state.archived = await api(`/api/host/${state.hostCode}/questions?archived=1`);
+      } catch {
+        state.questions = [];
+        state.archived = [];
+      }
     }
 
     async function loadAllTime() {
@@ -234,6 +240,9 @@
             </div>
           </div>`;
       } else if (state.view === 'host') {
+        const archivedOptions = state.archived.length
+          ? state.archived.map(q => `<option value="${q.id}">${q.text}</option>`).join('')
+          : '<option value="">No archived questions</option>';
         app.innerHTML = `
           <div class="min-h-screen p-6 max-w-6xl mx-auto">
             <header class="flex items-center justify-between mb-8">
@@ -278,6 +287,13 @@
                   <button onclick="saveQuestion()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save question</button>
                   <button onclick="toggleAdd()" class="ml-2 px-4 py-2 rounded-lg bg-stone-200 text-sm">Cancel</button>
                 </div>` : ''}
+                <div class="mt-6 pt-4 border-t border-stone-200">
+                  <label class="block text-sm font-medium mb-1">Archived questions</label>
+                  <select id="archivedSelect" class="mb-2">
+                    ${archivedOptions}
+                  </select>
+                  <button onclick="restoreArchived()" class="px-4 py-2 rounded-lg bg-stone-200 text-sm">Restore selected</button>
+                </div>
               </section>
               <section class="card">
                 <div class="flex justify-between items-center mb-4">
@@ -469,6 +485,17 @@
     async function archiveQuestion(qid) {
       try {
         await api(`/api/host/${state.hostCode}/questions/${qid}/archive`, { method: 'POST', body: { archived: true } });
+        await loadQuestions();
+        render();
+      } catch {}
+    }
+
+    async function restoreArchived() {
+      const sel = document.getElementById('archivedSelect');
+      const qid = sel && sel.value;
+      if (!qid) return;
+      try {
+        await api(`/api/host/${state.hostCode}/questions/${qid}/archive`, { method: 'POST', body: { archived: false } });
         await loadQuestions();
         render();
       } catch {}
