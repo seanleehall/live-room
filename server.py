@@ -27,7 +27,6 @@ def init_db():
         password TEXT DEFAULT '',
         created INTEGER
     )''')
-    # Add password column if it doesn't exist (for existing DBs)
     try:
         c.execute('ALTER TABLE hosts ADD COLUMN password TEXT DEFAULT ""')
     except sqlite3.OperationalError:
@@ -70,12 +69,22 @@ def check_password(code, password):
         return False
     stored = row[0] or ''
     if not stored:
-        return True  # no password set
+        return True
     return stored == hash_pw(password or '')
 
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
+
+@app.route('/api/host/check/<code>', methods=['GET'])
+def check_code(code):
+    code = code.upper().strip()
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute('SELECT code FROM hosts WHERE code=?', (code,))
+    taken = c.fetchone() is not None
+    conn.close()
+    return jsonify({'code': code, 'taken': taken})
 
 @app.route('/api/host', methods=['POST'])
 def create_or_get_host():
@@ -102,13 +111,11 @@ def secure_host(code):
         return jsonify({'error': 'Code must be at least 3 characters'}), 400
     conn = sqlite3.connect(DB)
     c = conn.cursor()
-    # Check if new code is taken (if different)
     if new_code != code:
         c.execute('SELECT code FROM hosts WHERE code=?', (new_code,))
         if c.fetchone():
             conn.close()
             return jsonify({'error': 'That code is already taken'}), 400
-        # Rename
         c.execute('UPDATE hosts SET code=? WHERE code=?', (new_code, code))
         c.execute('UPDATE questions SET host_code=? WHERE host_code=?', (new_code, code))
         c.execute('UPDATE sessions SET host_code=? WHERE host_code=?', (new_code, code))
@@ -164,12 +171,31 @@ def questions(code):
         conn.close()
         return jsonify({'id': qid})
     else:
-        # GET does not require password so audience can see, but host view will check separately
         archived = request.args.get('archived', '0')
         c.execute('SELECT id, text, qtype, options, used, archived FROM questions WHERE host_code=? AND archived=?', (code, int(archived)))
         rows = c.fetchall()
         conn.close()
         return jsonify([{'id': r[0], 'text': r[1], 'type': r[2], 'options': r[3], 'used': r[4], 'archived': r[5]} for r in rows])
+
+@app.route('/api/host/<code>/alltime', methods=['GET'])
+def alltime_results(code):
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute('''SELECT q.id, q.text, q.qtype, q.options, a.choice, COUNT(*) as cnt
+                 FROM questions q
+                 LEFT JOIN sessions s ON s.question_id = q.id
+                 LEFT JOIN answers a ON a.session_id = s.id
+                 WHERE q.host_code=? AND q.archived=0
+                 GROUP BY q.id, a.choice''', (code,))
+    rows = c.fetchall()
+    conn.close()
+    by_q = {}
+    for qid, text, qtype, options, choice, cnt in rows:
+        if qid not in by_q:
+            by_q[qid] = {'id': qid, 'text': text, 'type': qtype, 'options': options, 'results': {}}
+        if choice:
+            by_q[qid]['results'][choice] = cnt
+    return jsonify(list(by_q.values()))
 
 @app.route('/api/host/<code>/questions/<int:qid>/archive', methods=['POST'])
 def archive_question(code, qid):
