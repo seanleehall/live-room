@@ -47,7 +47,8 @@
       showAdd: false,
       showAllTime: false,
       allTime: [],
-      newAnswers: []
+      newAnswers: [],
+      draftQuestion: ''
     };
     let pollTimer;
 
@@ -300,7 +301,7 @@
                 ${state.showAdd ? `
                 <div class="mt-4 p-5 bg-stone-50 rounded-xl border border-stone-200">
                   <label class="block text-sm mb-1">Question</label>
-                  <textarea id="qText" rows="2" class="mb-3" placeholder="What do you want to ask?"></textarea>
+                  <textarea id="qText" rows="2" class="mb-3" placeholder="What do you want to ask?" oninput="state.draftQuestion = this.value">${state.draftQuestion.replace(/</g,'<').replace(/>/g,'>')}</textarea>
                   <label class="block text-sm mb-2">Answers</label>
                   <div id="answerList" class="space-y-2 mb-3">
                     ${state.newAnswers.map((a, i) => `<div class="flex gap-2"><input value="${a.replace(/"/g,'"')}" onchange="updateAnswer(${i}, this.value)" class="flex-1" /><button onclick="removeAnswer(${i})" class="px-3 bg-stone-200 rounded text-sm">×</button></div>`).join('')}
@@ -427,7 +428,10 @@
     function toggleBrand() { state.showBrand = !state.showBrand; render(); }
     function toggleAdd() {
       state.showAdd = !state.showAdd;
-      if (state.showAdd) state.newAnswers = [];
+      if (state.showAdd) {
+        state.newAnswers = [];
+        state.draftQuestion = '';
+      }
       render();
     }
     function addAnswer() {
@@ -435,12 +439,16 @@
       const val = input && input.value.trim();
       if (val) {
         state.newAnswers.push(val);
+        const qText = document.getElementById('qText');
+        if (qText) state.draftQuestion = qText.value;
         render();
       }
     }
     function updateAnswer(i, val) { state.newAnswers[i] = val; }
     function removeAnswer(i) {
       state.newAnswers.splice(i, 1);
+      const qText = document.getElementById('qText');
+      if (qText) state.draftQuestion = qText.value;
       render();
     }
     async function toggleAllTime() {
@@ -519,7 +527,7 @@
     }
 
     async function saveQuestion() {
-      const text = document.getElementById('qText').value.trim();
+      const text = (document.getElementById('qText') && document.getElementById('qText').value.trim()) || state.draftQuestion.trim();
       const errEl = document.getElementById('qError');
       if (!text) {
         if (errEl) errEl.textContent = 'Please enter a question.';
@@ -537,6 +545,7 @@
         });
         state.showAdd = false;
         state.newAnswers = [];
+        state.draftQuestion = '';
         state.statusMsg = 'Question saved.';
         await loadQuestions();
         render();
