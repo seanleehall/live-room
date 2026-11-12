@@ -58,7 +58,7 @@
     }
 
     function qrSrc(text) {
-      return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(text)}`;
+      return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=10&data=${encodeURIComponent(text)}`;
     }
 
     function getDominantColor(imgSrc, callback) {
@@ -198,8 +198,8 @@
                 <div id="timer" class="text-lg text-stone-600 mb-4"></div>
                 <div id="results"></div>
                 <div class="mt-6 text-center">
-                  <p class="text-xs text-stone-500 mb-2">Scan to answer</p>
-                  <img src="${qr}" class="mx-auto" width="140" height="140" alt="QR" />
+                  <p class="text-sm text-stone-500 mb-3">Scan to answer</p>
+                  <img src="${qr}" class="mx-auto" width="280" height="280" alt="QR" />
                 </div>
               </section>
             </div>
@@ -218,8 +218,8 @@
               <div id="results" class="w-full max-w-xl"></div>
             </div>
             <div class="mt-8 text-center">
-              <p class="text-sm text-stone-500 mb-2">Scan to answer · Join before time runs out</p>
-              <img src="${qr}" class="mx-auto bg-white p-2" width="140" height="140" alt="QR" />
+              <p class="text-lg text-stone-500 mb-3">Scan to answer · Join before time runs out</p>
+              <img src="${qr}" class="mx-auto bg-white p-3" width="320" height="320" alt="QR" />
             </div>
           </div>`;
         startLive();
