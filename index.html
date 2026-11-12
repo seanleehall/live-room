@@ -7,6 +7,7 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231e3a5f'/%3E%3Crect x='22' y='55' width='14' height='25' rx='3' fill='white'/%3E%3Crect x='43' y='35' width='14' height='45' rx='3' fill='white'/%3E%3Crect x='64' y='45' width='14' height='35' rx='3' fill='white'/%3E%3C/svg%3E">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script>
   <style>
     body { font-family: 'Montserrat', system-ui, sans-serif; background: #f3eee4; color: #141210; }
     .card { background: #fffdf9; border: 1px solid #e8e0d0; border-radius: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04); padding: 1.75rem 1.75rem; }
@@ -30,11 +31,13 @@
   <div id="app"></div>
   <script>
     const API = window.location.origin;
+    const DEFAULT_BRANDING = { name: 'pollme.live', primary: '#1e3a5f', background: '#f3eee4', logo: '' };
+    const DEFAULT_LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231e3a5f'/%3E%3Crect x='22' y='55' width='14' height='25' rx='3' fill='white'/%3E%3Crect x='43' y='35' width='14' height='45' rx='3' fill='white'/%3E%3Crect x='64' y='45' width='14' height='35' rx='3' fill='white'/%3E%3C/svg%3E";
     let state = {
       view: 'home',
       hostCode: localStorage.getItem('hostCode') || '',
       hostPassword: localStorage.getItem('hostPassword') || '',
-      branding: JSON.parse(localStorage.getItem('branding') || '{"name":"pollme.live","primary":"#1e3a5f","background":"#f3eee4","logo":""}'),
+      branding: JSON.parse(localStorage.getItem('branding') || JSON.stringify(DEFAULT_BRANDING)),
       questions: [],
       archived: [],
       live: null,
@@ -218,6 +221,7 @@
       const app = document.getElementById('app');
       const primary = state.branding.primary || '#1e3a5f';
       const name = state.branding.name || 'pollme.live';
+      const logoSrc = state.branding.logo || DEFAULT_LOGO;
       const joinUrl = `${window.location.origin}/?join=${state.hostCode}`;
       const qr = qrSrc(joinUrl);
       const isLive = state.live && state.live.active;
@@ -262,7 +266,7 @@
           <div class="min-h-screen p-6 max-w-6xl mx-auto">
             <header class="flex items-center justify-between mb-8">
               <div class="flex items-center gap-3">
-                ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-10 object-contain" />` : ''}
+                <img src="${logoSrc}" class="h-10 object-contain" />
                 <div>
                   <h1 class="text-xl font-bold" style="color:${primary}">${name}</h1>
                   <p class="text-xs text-stone-500">Host code <span class="font-mono font-bold">${state.hostCode}</span></p>
@@ -349,13 +353,20 @@
               <button onclick="saveRoom()" class="mt-4 px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Save room</button>
               <div id="saveStatus" class="text-sm mt-2"></div>
             </div>
+            <div class="mt-6 card text-sm">
+              <p class="mb-2 font-medium">Quick thought or fix?</p>
+              <textarea id="feedbackText" rows="2" placeholder="What would make this better?" class="mb-2"></textarea>
+              <div class="g-recaptcha mb-2" data-sitekey="6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI"></div>
+              <button onclick="sendFeedback()" class="px-4 py-2 rounded-lg text-white text-sm" style="background:${primary}">Send to sleehall@gmail.com</button>
+              <div id="feedbackStatus" class="text-xs mt-2"></div>
+            </div>
           </div>`;
         startLive();
       } else if (state.view === 'projector') {
         app.innerHTML = `
           <div class="min-h-screen flex flex-col p-8">
             <header class="flex items-center gap-3 mb-8">
-              ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-16 object-contain" />` : ''}
+              <img src="${logoSrc}" class="h-16 object-contain" />
               <div class="text-xl font-bold" style="color:${primary}">${name}</div>
             </header>
             <div class="flex-1 flex flex-col items-center justify-center text-center">
@@ -372,7 +383,7 @@
       } else if (state.view === 'audience') {
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
-            ${state.branding.logo ? `<img src="${state.branding.logo}" class="h-16 mb-4 object-contain" />` : ''}
+            <img src="${logoSrc}" class="h-16 mb-4 object-contain" />
             <h1 class="text-xl font-bold mb-6" style="color:${primary}">${name}</h1>
             <div id="live-q" class="text-xl font-semibold mb-2">Waiting for the host to start a question…</div>
             <div id="choices"></div>
@@ -397,7 +408,7 @@
       if (!state.questions.length) return '<p class="text-stone-500 italic text-sm">No questions yet.</p>';
       const isLive = state.live && state.live.active;
       return state.questions.map(q => {
-        const thisLive = isLive && state.live.question === q.text;
+        const thisLive = isLive && state.live.question_id === q.id;
         return `
         <div class="q-item flex justify-between items-center">
           <div>
@@ -606,6 +617,8 @@
     async function startHost() {
       state.hostCode = '';
       state.hostPassword = '';
+      state.branding = { ...DEFAULT_BRANDING };
+      saveLocal();
       const res = await api('/api/host', { method: 'POST', body: state.branding });
       state.hostCode = res.code;
       saveLocal();
@@ -681,6 +694,26 @@
         state.answered = true;
         renderChoices();
       } catch {}
+    }
+
+    function sendFeedback() {
+      const text = document.getElementById('feedbackText').value.trim();
+      const status = document.getElementById('feedbackStatus');
+      if (!text) {
+        if (status) status.textContent = 'Please write something.';
+        return;
+      }
+      const recaptcha = typeof grecaptcha !== 'undefined' && grecaptcha.getResponse();
+      if (!recaptcha) {
+        if (status) status.textContent = 'Please complete the reCAPTCHA.';
+        return;
+      }
+      const subject = encodeURIComponent('pollme.live feedback');
+      const body = encodeURIComponent(text + '\n\nHost code: ' + (state.hostCode || 'none'));
+      window.open(`mailto:sleehall@gmail.com?subject=${subject}&body=${body}`);
+      if (status) status.textContent = 'Opened your email app — send when ready.';
+      document.getElementById('feedbackText').value = '';
+      if (typeof grecaptcha !== 'undefined') grecaptcha.reset();
     }
 
     function startLive() {
