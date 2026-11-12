@@ -62,7 +62,7 @@ def create_or_get_host():
     row = c.fetchone()
     if not row:
         c.execute('INSERT INTO hosts (code, name, primary_color, logo, created) VALUES (?, ?, ?, ?, ?)',
-                  (code, data.get('name', 'Live Room'), data.get('primary', '#1e40af'), data.get('logo', ''), int(time.time())))
+                  (code, data.get('name', 'pollme.live'), data.get('primary', '#1e3a5f'), data.get('logo', ''), int(time.time())))
         conn.commit()
     conn.close()
     return jsonify({'code': code})
@@ -113,12 +113,47 @@ def start_session():
     sid = str(uuid.uuid4())[:8]
     conn = sqlite3.connect(DB)
     c = conn.cursor()
+    # Deactivate previous sessions for this host
+    c.execute('UPDATE sessions SET active=0 WHERE host_code=?', (data['host'],))
     c.execute('INSERT INTO sessions (id, host_code, question_id, started, duration) VALUES (?, ?, ?, ?, ?)',
               (sid, data['host'], data['question_id'], int(time.time()), data.get('duration', 180)))
     c.execute('UPDATE questions SET used = used + 1 WHERE id=?', (data['question_id'],))
     conn.commit()
     conn.close()
     return jsonify({'session_id': sid})
+
+@app.route('/api/host/<code>/current', methods=['GET'])
+def current_session(code):
+    conn = sqlite3.connect(DB)
+    c = conn.cursor()
+    c.execute('''SELECT s.id, s.started, s.duration, s.active, q.text, q.qtype, q.options
+                 FROM sessions s JOIN questions q ON s.question_id = q.id
+                 WHERE s.host_code=? AND s.active=1 ORDER BY s.started DESC LIMIT 1''', (code,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'active': False})
+    now = int(time.time())
+    remaining = max(0, row[2] - (now - row[1]))
+    if remaining <= 0:
+        c.execute('UPDATE sessions SET active=0 WHERE id=?', (row[0],))
+        conn.commit()
+        conn.close()
+        return jsonify({'active': False})
+    c.execute('SELECT choice, COUNT(*) FROM answers WHERE session_id=? GROUP BY choice', (row[0],))
+    counts = dict(c.fetchall())
+    conn.close()
+    return jsonify({
+        'active': True,
+        'session_id': row[0],
+        'started': row[1],
+        'duration': row[2],
+        'remaining': remaining,
+        'question': row[4],
+        'type': row[5],
+        'options': row[6],
+        'results': counts
+    })
 
 @app.route('/api/session/<sid>', methods=['GET'])
 def get_session(sid):
@@ -155,4 +190,5 @@ def submit_answer():
     return jsonify({'ok': True})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    port = int(os.environ.get('PORT', 8000))
+    app.run(host='0.0.0.0', port=port)
