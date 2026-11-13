@@ -671,8 +671,9 @@
         state.hostCode = res.code;
         state.hostPassword = password;
         saveLocal();
-        if (status) status.textContent = 'Saved! You can resume with this code and password anytime.';
-        setTimeout(() => render(), 1500);
+        await loadQuestions();
+        if (status) status.textContent = 'Saved! Your questions are now linked to this code. You can resume anytime.';
+        setTimeout(() => render(), 800);
       } catch (e) {
         if (status) status.textContent = e.message || 'Could not save. Code may be taken.';
       }
@@ -828,6 +829,10 @@
       loadHostBranding().then(() => render());
     } else if (params.get('host')) {
       state.hostCode = params.get('host');
+      state.view = 'host';
+      loadQuestions().then(() => loadHostBranding()).then(() => render());
+    } else if (state.hostCode) {
+      // Resume from localStorage if we have a saved code
       state.view = 'host';
       loadQuestions().then(() => loadHostBranding()).then(() => render());
     } else {
