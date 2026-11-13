@@ -33,7 +33,6 @@
   <script>
     const API = window.location.origin;
     const DEFAULT_BRANDING = { name: 'pollme.live', primary: '#1e3a5f', background: '#f3eee4', logo: '' };
-    // Original pollme.live bar chart logo
     const DEFAULT_LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231e3a5f'/%3E%3Crect x='22' y='55' width='14' height='25' rx='3' fill='white'/%3E%3Crect x='43' y='35' width='14' height='45' rx='3' fill='white'/%3E%3Crect x='64' y='45' width='14' height='35' rx='3' fill='white'/%3E%3C/svg%3E";
     let state = {
       view: 'home',
@@ -272,10 +271,8 @@
       applyTheme();
       updateUrl();
       const app = document.getElementById('app');
-      // Home always uses original branding
       const primary = state.view === 'home' ? DEFAULT_BRANDING.primary : (state.branding.primary || '#1e3a5f');
       const name = state.view === 'home' ? DEFAULT_BRANDING.name : (state.branding.name || 'pollme.live');
-      // Home and fallback use original logo; audience/host/projector use uploaded if available
       const logoSrc = (state.view === 'home' || !state.branding.logo) ? DEFAULT_LOGO : state.branding.logo;
       const joinUrl = `${window.location.origin}/?join=${state.hostCode}`;
       const qr = qrSrc(joinUrl);
@@ -838,10 +835,9 @@
       state.hostCode = params.get('host');
       state.view = 'host';
       loadQuestions().then(() => loadHostBranding()).then(() => render());
-    } else if (state.hostCode) {
-      state.view = 'host';
-      loadQuestions().then(() => loadHostBranding()).then(() => render());
     } else {
+      // Always show home page when no query params
+      state.view = 'home';
       applyTheme();
       render();
     }
