@@ -25,7 +25,7 @@
     }
     .support-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
     .support-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgb(16 185 129); }
-    .audience-logo { max-height: 80px; max-width: 220px; object-fit: contain; margin-bottom: 1rem; }
+    .audience-logo { max-height: 90px; max-width: 240px; object-fit: contain; margin-bottom: 0.75rem; }
   </style>
 </head>
 <body class="min-h-screen antialiased">
@@ -155,11 +155,13 @@
       if (!state.hostCode) return;
       try {
         const b = await api(`/api/host/${state.hostCode}`);
-        if (b.name) state.branding.name = b.name;
-        if (b.primary) state.branding.primary = b.primary;
-        if (b.logo) state.branding.logo = b.logo;
+        if (b && b.name) state.branding.name = b.name;
+        if (b && b.primary) state.branding.primary = b.primary;
+        if (b && b.logo) state.branding.logo = b.logo;
         applyTheme();
-      } catch {}
+      } catch (e) {
+        console.warn('Could not load branding', e);
+      }
     }
 
     function qrSrc(text) {
@@ -569,12 +571,14 @@
       state.showBrand = false;
       render();
       if (state.hostCode) {
+        // Allow larger logos (up to ~1.5MB base64)
+        const logoToSave = state.branding.logo && state.branding.logo.length < 2000000 ? state.branding.logo : '';
         api(`/api/host/${state.hostCode}/branding`, {
           method: 'POST',
           body: {
             name: state.branding.name,
             primary: state.branding.primary,
-            logo: state.branding.logo && state.branding.logo.length < 500000 ? state.branding.logo : '',
+            logo: logoToSave,
             password: state.hostPassword
           }
         }).catch(() => {});
@@ -824,7 +828,7 @@
       state.view = 'projector';
       loadHostBranding().then(() => render());
     } else if (params.get('join')) {
-      state.hostCode = params.get('join');
+      state.hostCode = params.get('join').toUpperCase();
       state.view = 'audience';
       loadHostBranding().then(() => render());
     } else if (params.get('host')) {
@@ -832,7 +836,6 @@
       state.view = 'host';
       loadQuestions().then(() => loadHostBranding()).then(() => render());
     } else if (state.hostCode) {
-      // Resume from localStorage if we have a saved code
       state.view = 'host';
       loadQuestions().then(() => loadHostBranding()).then(() => render());
     } else {
