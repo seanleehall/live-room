@@ -25,6 +25,7 @@
     }
     .support-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
     .support-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgb(16 185 129); }
+    .audience-logo { max-height: 80px; max-width: 220px; object-fit: contain; margin-bottom: 1rem; }
   </style>
 </head>
 <body class="min-h-screen antialiased">
@@ -97,7 +98,6 @@
     }
 
     function applyTheme() {
-      // Home page always uses default theme
       if (state.view === 'home') {
         document.body.style.background = DEFAULT_BRANDING.background;
         document.documentElement.style.setProperty('--primary', DEFAULT_BRANDING.primary);
@@ -269,7 +269,6 @@
       applyTheme();
       updateUrl();
       const app = document.getElementById('app');
-      // Home page always uses default colors
       const primary = state.view === 'home' ? DEFAULT_BRANDING.primary : (state.branding.primary || '#1e3a5f');
       const name = state.view === 'home' ? DEFAULT_BRANDING.name : (state.branding.name || 'pollme.live');
       const logoSrc = state.view === 'home' ? DEFAULT_LOGO : (state.branding.logo || DEFAULT_LOGO);
@@ -437,7 +436,7 @@
       } else if (state.view === 'audience') {
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
-            <img src="${logoSrc}" class="h-16 mb-4 object-contain" />
+            <img src="${logoSrc}" class="audience-logo" alt="${name} logo" />
             <h1 class="text-xl font-bold mb-6" style="color:${primary}">${name}</h1>
             <div id="live-q" class="text-xl font-semibold mb-2">Waiting for the host to start a question…</div>
             <div id="choices"></div>
