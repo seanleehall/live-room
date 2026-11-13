@@ -84,7 +84,6 @@
       const textLum = luminance(textHex);
       const ratio = (Math.max(bgLum, textLum) + 0.05) / (Math.min(bgLum, textLum) + 0.05);
       if (ratio >= 4.5) return bgHex;
-      // Darken background until contrast is good
       let percent = 0;
       let adjusted = bgHex;
       while (percent < 80) {
@@ -98,6 +97,12 @@
     }
 
     function applyTheme() {
+      // Home page always uses default theme
+      if (state.view === 'home') {
+        document.body.style.background = DEFAULT_BRANDING.background;
+        document.documentElement.style.setProperty('--primary', DEFAULT_BRANDING.primary);
+        return;
+      }
       let bg = state.branding.background || '#f3eee4';
       bg = ensureContrast(bg);
       state.branding.background = bg;
@@ -264,9 +269,10 @@
       applyTheme();
       updateUrl();
       const app = document.getElementById('app');
-      const primary = state.branding.primary || '#1e3a5f';
-      const name = state.branding.name || 'pollme.live';
-      const logoSrc = state.branding.logo || DEFAULT_LOGO;
+      // Home page always uses default colors
+      const primary = state.view === 'home' ? DEFAULT_BRANDING.primary : (state.branding.primary || '#1e3a5f');
+      const name = state.view === 'home' ? DEFAULT_BRANDING.name : (state.branding.name || 'pollme.live');
+      const logoSrc = state.view === 'home' ? DEFAULT_LOGO : (state.branding.logo || DEFAULT_LOGO);
       const joinUrl = `${window.location.origin}/?join=${state.hostCode}`;
       const qr = qrSrc(joinUrl);
       const isLive = state.live && state.live.active;
@@ -770,7 +776,6 @@
       const subject = encodeURIComponent('pollme.live feedback');
       const body = encodeURIComponent(text + '\n\nHost code: ' + (state.hostCode || 'none'));
       const mailto = `mailto:sleehall@gmail.com?subject=${subject}&body=${body}`;
-      // Try multiple ways to open email
       const a = document.createElement('a');
       a.href = mailto;
       a.style.display = 'none';
