@@ -25,7 +25,7 @@
     }
     .support-btn { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
     .support-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 15px -3px rgb(16 185 129); }
-    .audience-logo { max-height: 90px; max-width: 240px; object-fit: contain; margin-bottom: 0.75rem; }
+    .audience-logo { max-height: 100px; max-width: 260px; object-fit: contain; margin-bottom: 0.75rem; }
   </style>
 </head>
 <body class="min-h-screen antialiased">
@@ -33,6 +33,7 @@
   <script>
     const API = window.location.origin;
     const DEFAULT_BRANDING = { name: 'pollme.live', primary: '#1e3a5f', background: '#f3eee4', logo: '' };
+    // Original pollme.live bar chart logo
     const DEFAULT_LOGO = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%231e3a5f'/%3E%3Crect x='22' y='55' width='14' height='25' rx='3' fill='white'/%3E%3Crect x='43' y='35' width='14' height='45' rx='3' fill='white'/%3E%3Crect x='64' y='45' width='14' height='35' rx='3' fill='white'/%3E%3C/svg%3E";
     let state = {
       view: 'home',
@@ -271,9 +272,11 @@
       applyTheme();
       updateUrl();
       const app = document.getElementById('app');
+      // Home always uses original branding
       const primary = state.view === 'home' ? DEFAULT_BRANDING.primary : (state.branding.primary || '#1e3a5f');
       const name = state.view === 'home' ? DEFAULT_BRANDING.name : (state.branding.name || 'pollme.live');
-      const logoSrc = state.view === 'home' ? DEFAULT_LOGO : (state.branding.logo || DEFAULT_LOGO);
+      // Home and fallback use original logo; audience/host/projector use uploaded if available
+      const logoSrc = (state.view === 'home' || !state.branding.logo) ? DEFAULT_LOGO : state.branding.logo;
       const joinUrl = `${window.location.origin}/?join=${state.hostCode}`;
       const qr = qrSrc(joinUrl);
       const isLive = state.live && state.live.active;
@@ -282,6 +285,7 @@
         app.innerHTML = `
           <div class="min-h-screen flex flex-col items-center justify-center p-8">
             <div class="text-center max-w-md w-full">
+              <img src="${DEFAULT_LOGO}" class="h-20 mx-auto mb-4" alt="pollme.live" />
               <h1 class="text-5xl font-bold mb-4" style="color:${primary}">pollme.live</h1>
               <p class="text-stone-600 mb-2">Ask questions.</p>
               <p class="text-stone-600 mb-2">See the room answer.</p>
@@ -571,7 +575,6 @@
       state.showBrand = false;
       render();
       if (state.hostCode) {
-        // Allow larger logos (up to ~1.5MB base64)
         const logoToSave = state.branding.logo && state.branding.logo.length < 2000000 ? state.branding.logo : '';
         api(`/api/host/${state.hostCode}/branding`, {
           method: 'POST',
